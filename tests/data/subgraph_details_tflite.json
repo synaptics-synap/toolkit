@@ -1,0 +1,244 @@
+{
+ "subgraphs": {
+  "subgraph_0": {
+   "name": "subgraph_0",
+   "inputs": [
+    {
+     "tensor_id": "21",
+     "global_tensor_id": "21",
+     "name": "MobilenetV2/expanded_conv_1/expand/Relu6",
+     "shape": [
+      "1",
+      "112",
+      "112",
+      "96"
+     ],
+     "data_type": "DataType.UINT8",
+     "quantization_params": {
+      "scale": "0.023528477177023888",
+      "zero_point": "0"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "tensor_id": "24",
+     "global_tensor_id": "24",
+     "name": "MobilenetV2/expanded_conv_1/project/add_fold",
+     "shape": [
+      "1",
+      "56",
+      "56",
+      "24"
+     ],
+     "data_type": "DataType.UINT8",
+     "quantization_params": {
+      "scale": "0.2758343517780304",
+      "zero_point": "119"
+     }
+    }
+   ]
+  },
+  "subgraph_1": {
+   "name": "subgraph_1",
+   "inputs": [
+    {
+     "tensor_id": "24",
+     "global_tensor_id": "24",
+     "name": "MobilenetV2/expanded_conv_1/project/add_fold",
+     "shape": [
+      "1",
+      "56",
+      "56",
+      "24"
+     ],
+     "data_type": "DataType.UINT8",
+     "quantization_params": {
+      "scale": "0.2758343517780304",
+      "zero_point": "119"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "tensor_id": "93",
+     "global_tensor_id": "93",
+     "name": "MobilenetV2/expanded_conv_2/add",
+     "shape": [
+      "1",
+      "56",
+      "56",
+      "24"
+     ],
+     "data_type": "DataType.UINT8",
+     "quantization_params": {
+      "scale": "0.43216896057128906",
+      "zero_point": "133"
+     }
+    }
+   ]
+  },
+  "subgraph_2": {
+   "name": "subgraph_2",
+   "inputs": [
+    {
+     "tensor_id": "93",
+     "global_tensor_id": "93",
+     "name": "MobilenetV2/expanded_conv_2/add",
+     "shape": [
+      "1",
+      "56",
+      "56",
+      "24"
+     ],
+     "data_type": "DataType.UINT8",
+     "quantization_params": {
+      "scale": "0.43216896057128906",
+      "zero_point": "133"
+     }
+    }
+   ],
+   "outputs": [
+    {
+     "tensor_id": "107",
+     "global_tensor_id": "107",
+     "name": "MobilenetV2/expanded_conv_3/expand/Relu6",
+     "shape": [
+      "1",
+      "56",
+      "56",
+      "144"
+     ],
+     "data_type": "DataType.UINT8",
+     "quantization_params": {
+      "scale": "0.023528477177023888",
+      "zero_point": "0"
+     }
+    }
+   ]
+  }
+ },
+ "target_delegates": {
+  "subgraph_0": { "type": "Delegate.NPU", "options": "" },
+  "subgraph_1": { "type": "Delegate.CPU", "options": "" },
+  "subgraph_2": { "type": "Delegate.GPU", "options": "" }
+ },
+ "subgraph_metas": {
+  "subgraph_0": {
+   "network_format": "NetworkFormat.TFLITE",
+   "layout": "DataLayout.DEFAULT",
+   "input_format": "",
+   "output_format": "",
+   "optimize": "True",
+   "dequantize_outputs": "False",
+   "inputs": [
+    {
+     "name": "MobilenetV2/expanded_conv_1/expand/Relu6",
+     "means": "None",
+     "scale": "None",
+     "data_format": "",
+     "security": "any",
+     "preproc": "None",
+     "tensor_h": "None",
+     "tensor_w": "None",
+     "shape": [
+      "1",
+      "112",
+      "112",
+      "96"
+     ]
+    }
+   ],
+   "outputs": [
+    {
+     "name": "None",
+     "dequantize": "False",
+     "data_format": "",
+     "security": "secure-if-input-secure",
+     "shape": "None"
+    }
+   ],
+   "quantization": "None",
+   "security": "None",
+   "delegates": {
+       "*": { "type": "Delegate.NPU", "options": "" }
+   }
+  },
+  "subgraph_1": {
+   "network_format": "NetworkFormat.TFLITE",
+   "layout": "DataLayout.DEFAULT",
+   "input_format": "",
+   "output_format": "",
+   "optimize": "True",
+   "dequantize_outputs": "False",
+   "inputs": [
+    {
+     "name": "None",
+     "means": "None",
+     "scale": "None",
+     "data_format": "",
+     "security": "any",
+     "preproc": "None",
+     "tensor_h": "None",
+     "tensor_w": "None",
+     "shape": "None"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "None",
+     "dequantize": "False",
+     "data_format": "",
+     "security": "secure-if-input-secure",
+     "shape": "None"
+    }
+   ],
+   "quantization": "None",
+   "security": "None",
+   "delegates": {
+    "*": {"options": "", "type": "Delegate.CPU"}
+   }
+  },
+  "subgraph_2": {
+   "network_format": "NetworkFormat.TFLITE",
+   "layout": "DataLayout.DEFAULT",
+   "input_format": "",
+   "output_format": "",
+   "optimize": "True",
+   "dequantize_outputs": "False",
+   "inputs": [
+    {
+     "name": "None",
+     "means": "None",
+     "scale": "None",
+     "data_format": "",
+     "security": "any",
+     "preproc": "None",
+     "tensor_h": "None",
+     "tensor_w": "None",
+     "shape": "None"
+    }
+   ],
+   "outputs": [
+    {
+     "name": "MobilenetV2/expanded_conv_3/expand/Relu6",
+     "dequantize": "False",
+     "data_format": "",
+     "security": "secure-if-input-secure",
+     "shape": "None"
+    }
+   ],
+   "quantization": "None",
+   "security": "None",
+   "delegates": {
+    "*": {"options": "", "type": "Delegate.GPU"}
+   }
+  }
+ },
+ "inputs": [
+  "21"
+ ],
+ "outputs": [
+  "107"
+ ]
+}

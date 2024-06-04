@@ -1,0 +1,40 @@
+{
+ "graph": [
+  {
+   "inputs": [
+    {
+     "subgraph": -1,
+     "out": 0
+    }
+   ],
+   "model": "0/model.meta",
+   "meta": "0/model.nb"
+  },
+  {
+   "inputs": [
+    {
+     "subgraph": 0,
+     "out": 0
+    }
+   ],
+   "model": "1/model.meta",
+   "meta": "1/model.nb"
+  },
+  {
+   "inputs": [
+    {
+     "subgraph": 1,
+     "out": 0
+    }
+   ],
+   "model": "2/model.meta",
+   "meta": "2/model.nb"
+  }
+ ],
+ "outputs": [
+  {
+   "subgraph": 2,
+   "out": 1
+  }
+ ]
+}

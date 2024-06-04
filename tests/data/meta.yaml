@@ -1,0 +1,10 @@
+delegate:
+  "*" : cpu
+  "4" : npu
+  "5" : npu
+  "10" : gpu
+inputs:
+  - name: MobilenetV2/expanded_conv_1/expand/Relu6
+    shape: [1, 112, 112, 96]
+outputs:
+  - name: MobilenetV2/expanded_conv_3/expand/Relu6
