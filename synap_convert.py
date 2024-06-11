@@ -134,6 +134,9 @@ def main():
         else:
             meta = MetaInfo()
 
+        if not args.silent:
+            print("Converting...\r", end='')
+
         model_formats = {
             '.tflite': NetworkFormat.TFLITE,
             '.onnx': NetworkFormat.ONNX,
@@ -232,6 +235,9 @@ def main():
 
         sys.exit(1)
 
+    if not args.silent:
+        print("Conversion successful")
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()
