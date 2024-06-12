@@ -10,6 +10,7 @@ import warnings
 from logging.handlers import MemoryHandler
 from pathlib import Path
 import sys
+import pathlib
 import argparse
 import traceback
 from tempfile import TemporaryDirectory
@@ -79,6 +80,20 @@ def main():
         logging.getLogger().addHandler(memory_handler)
 
     logger = logging.getLogger("synap")
+
+    # make sure the tools dir is available
+    tools_dir = args.tools_dir
+    if tools_dir is None:
+        # Assume the directory layout of the public toolkit directory
+        synap_dir = pathlib.Path(__file__).parent.parent.absolute()
+        tools_dir = os.path.join(synap_dir, "toolkit-prebuilt")
+    if not os.path.isdir(tools_dir):
+        raise ConversionError(f"\n\nCan't find directory for toolkit prebuilts: {tools_dir}\n"
+                              "You can use the '--tools-dir' option to set the toolkit prebuilts path "
+                              "or install it along the toolkit from:\n\n"
+                              "      https://github.com/synaptics-synap/toolkit-prebuilts\n")
+
+
     work_dir = out_dir / 'build'
 
     if work_dir.is_dir():
@@ -147,10 +162,10 @@ def main():
             '.pth': NetworkFormat.TORCH
         }
 
-        meta.network_format = model_formats.get(model_path.suffix.lower()) 
+        meta.network_format = model_formats.get(model_path.suffix.lower())
         if meta.network_format == None:
             raise ConversionError(f"unknown network format: {model_path.suffix}")
-        
+
         if meta.network_format == NetworkFormat.TORCH:
             # Convert torchscript format to ONNX
             model_path = pytorch_to_onnx(model_path, meta, work_dir, args.verbose)
@@ -159,7 +174,7 @@ def main():
         if args.out_format == 'synap':
             conversion_options = ConversionOptions(verbose=args.verbose, silent=args.silent, debug=args.debug,
                                                    profiling=args.profiling, cpu_profiling=args.cpu_profiling,
-                                                   vssdk_dir=args.vssdk_dir, tools_dir=args.tools_dir,
+                                                   vssdk_dir=args.vssdk_dir, tools_dir=tools_dir,
                                                    cache_dir=cache_dir,
                                                    target=target)
 

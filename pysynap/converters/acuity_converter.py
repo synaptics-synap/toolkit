@@ -219,10 +219,6 @@ class Converter:
         self._show_status("Compiling...")
         os.makedirs(out_dir, exist_ok=True)
 
-        if tools_dir is None:
-            # Assume the directory layout of the synap install directory
-            tools_dir = os.path.join(toolkit_dir, "..")
-
         tools_bin_dir = os.path.join(tools_dir, 'bin/x86_64-linux-gcc')
         if not os.path.isdir(tools_bin_dir):
             raise ConversionError(f"Can't find host tool directory: {tools_bin_dir}")
