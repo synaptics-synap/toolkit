@@ -1,0 +1,117 @@
+name: Build and Release pip package
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to checkout'
+        required: true
+        default: 'main'
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  build:
+    name: Build pip package
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout toolkit repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.branch }}
+        lfs: true
+
+    - name: Create prebuilts directory
+      run: mkdir -p pysynap/prebuilts
+
+    - name: Checkout toolkit-prebuilts repository
+      uses: actions/checkout@v4
+      with:
+        repository: synaptics-synap/toolkit-prebuilts
+        ref: main
+        path: pysynap/prebuilts
+        lfs: true
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.10.12
+
+    - name: Add __init__.py to scripts and prebuilts directories
+      run: |
+        mkdir -p pysynap/scripts
+        touch pysynap/scripts/__init__.py
+        touch pysynap/prebuilts/__init__.py
+      working-directory: ${{ github.workspace }}
+
+    - name: Install dependencies
+      run: |
+          python -m pip install --upgrade pip
+          pip install build
+          pip install --upgrade twine
+
+    - name: Run build and deploy github release
+      run: |
+        python3 -m build
+
+    - name: Fetch tags from master
+      run: |
+        git fetch origin main --tags
+
+    - name: Get the latest tag
+      id: get_latest_tag
+      run: echo "LATEST_TAG=$(git tag | sort --version-sort | tail -n1)" >> $GITHUB_ENV
+    
+    - name: Get wheel file name
+      run: echo "WHEEL_FILE=$(basename $(ls dist/*.whl))" >> $GITHUB_ENV
+      
+  
+    - name: Check if release exists
+      id: check_release
+      run: |
+        release_id=$(curl -sH "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.LATEST_TAG }}" \
+          | jq -r '.id')
+        if [ "$release_id" != "null" ]; then
+          echo "RELEASE_EXISTS=true" >> $GITHUB_ENV
+          echo "RELEASE_ID=$release_id" >> $GITHUB_ENV
+        else
+          echo "RELEASE_EXISTS=false" >> $GITHUB_ENV
+        fi
+
+    - name: Create release if it doesn't exist
+      if: env.RELEASE_EXISTS == 'false'
+      id: create_release
+      uses: actions/create-release@latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.LATEST_TAG }}
+        release_name: ${{ env.LATEST_TAG }}
+        body: |
+          Release created automatically by GitHub Actions.
+        draft: false
+        prerelease: true
+
+    - name: Upload wheel as asset (new release)
+      if: env.RELEASE_EXISTS == 'false'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/${{ env.WHEEL_FILE }}
+        asset_name: ${{ env.WHEEL_FILE }}
+        asset_content_type: application/zip
+
+    - name: Upload wheel as asset (existing release)
+      if: env.RELEASE_EXISTS == 'true'
+      run: |
+        curl -X POST \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Content-Type: application/zip" \
+          --data-binary @dist/${{ env.WHEEL_FILE }} \
+          "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ env.RELEASE_ID }}/assets?name=${{ env.WHEEL_FILE }}"
