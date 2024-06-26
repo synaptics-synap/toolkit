@@ -87,6 +87,9 @@ def main():
         # Assume the directory layout of the public toolkit directory
         synap_dir = pathlib.Path(__file__).parent.parent.absolute()
         tools_dir = os.path.join(synap_dir, "toolkit-prebuilts")
+        # check if prebuilts is avaiblle alongside
+        if not os.path.exists(tools_dir):
+            tools_dir  = os.path.join(synap_dir, "prebuilts")
     if not os.path.isdir(tools_dir):
         raise ConversionError(f"\n\nCan't find directory for toolkit prebuilts: {tools_dir}\n"
                               "You can use the '--tools-dir' option to set the toolkit prebuilts path "

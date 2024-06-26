@@ -1,0 +1,10 @@
+include *.py
+include pysynap/prebuilts/README.rst
+include pysynap/prebuilts/__init__.py
+
+recursive-include pysynap/prebuilts/acuitylib *
+recursive-include pysynap/prebuilts/bin *
+recursive-include pysynap/prebuilts/include *
+recursive-include pysynap/prebuilts/lib *
+recursive-include pysynap/prebuilts/pyarmor_runtime_001391 *
+recursive-include pysynap/prebuilts/vxk/ *
