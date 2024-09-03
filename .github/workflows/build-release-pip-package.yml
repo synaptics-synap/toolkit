@@ -62,25 +62,16 @@ jobs:
       run: |
         python3 -m build
 
-    - name: Store wheel as an artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: wheel-${{ matrix.python-version }}
-        path: dist/*.whl
-
-  upload:
-    name: Upload Wheels to GitHub Release
-    runs-on: ubuntu-22.04
-    needs: build
-
-    steps:
-    - name: Download wheels from all jobs
-      uses: actions/download-artifact@v3
-      with:
-        path: dist
+    - name: Get wheel file name
+      run: |
+        WHEEL_FILE=$(ls dist/*.whl)
+        if [ -z "$WHEEL_FILE" ]; then
+          echo "No wheel file found"
+          exit 1
+        fi
+        echo "WHEEL_FILE=$(basename $WHEEL_FILE)" >> $GITHUB_ENV
 
     - name: Get specified draft release
-      id: get_draft_release
       uses: actions/github-script@v6
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}
@@ -94,17 +85,18 @@ jobs:
             release.draft === true && release.name === releaseName
           );
           if (draftRelease) {
-            core.setOutput('upload_url', draftRelease.upload_url);
+            const fs = require('fs');
+            fs.appendFileSync(process.env.GITHUB_ENV, `upload_url=${draftRelease.upload_url}\n`);
           } else {
             core.setFailed(`No draft release found with name: ${releaseName}`);
           }
 
-    - name: Upload wheels as assets
+    - name: Upload wheel as asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.get_draft_release.outputs.upload_url }}
-        asset_path: dist/*
-        asset_name: $(basename dist/*)
+        upload_url: ${{ env.upload_url }}
+        asset_path: dist/${{ env.WHEEL_FILE }}
+        asset_name: ${{ env.WHEEL_FILE }}
         asset_content_type: application/zip
