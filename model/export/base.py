@@ -6,7 +6,9 @@ from pathlib import Path
 from shutil import copy2
 from tempfile import TemporaryDirectory
 from time import sleep
-from yaml import dump
+
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
 
 from model.utils.model_info import *
 
@@ -93,7 +95,7 @@ class ModelExporter(ABC):
     
     def generate_metadata(
         self, model_path: str, quant_type: str | None = None, quant_datasets: list[str] | None = None
-    ) -> str | None:
+    ) -> dict[str, list | dict] | None:
         try:
             inputs_info: list[dict] = self.generate_input_metadata(model_path)
             outputs_info: list[dict] = self.generate_output_metadata(model_path)
@@ -106,19 +108,19 @@ class ModelExporter(ABC):
         metadata["outputs"] = outputs_info
         if quant_info:
             metadata["quantization"] = quant_info
-        return (
-            dump(metadata, default_flow_style=False)
-            .replace("'", "")
-            .replace('"', "'")
-        )
+        return metadata
     
     def save_exported_model(
         self,
         model_path: str,
         export_dir: str,
-        metadata: str | None,
+        metadata: dict[str, list | dict] | None,
         quant_type: str | None,
     ) -> None:
+        
+        def tr_yaml(yaml: str) -> str:
+            return yaml.replace("'", "").replace('"', "'")
+
         export_dir: Path = Path(export_dir)
         if not export_dir.exists():
             export_dir.mkdir(exist_ok=True, parents=True)
@@ -127,10 +129,15 @@ class ModelExporter(ABC):
         copy2(model_path, export_path)
         # print(f'Exported model "{model_path}" copied to "{export_path}"')
         if metadata:
+            if quant_type == "mixed":
+                metadata["quantization"] = CommentedMap(metadata["quantization"])
+                metadata["quantization"].yaml_set_comment_before_after_key("data_type", after="add mixed quantzation layers here")
             with open(
                 f"{export_dir}/{self.model_info.yaml_filename(quant_type)}", "w"
             ) as f:
-                f.write(metadata)
+                yaml = YAML()
+                yaml.default_flow_style = False
+                yaml.dump(metadata, f, transform=tr_yaml)
         else:
             print(f"Metadata file not generated for {self.model_info}, please create manually")
 
@@ -150,7 +157,7 @@ def __run_exporter(
         model_path: str = exporter.export_model()
         print(f"Exporting {model_info} ... complete")
         for quant_type in quant_types:
-            metadata: str | None = exporter.generate_metadata(
+            metadata: dict[str, list | dict] | None = exporter.generate_metadata(
                 model_path, quant_type, quant_dataset
             )
             if metadata:
