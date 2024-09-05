@@ -3,8 +3,8 @@ name: Build and Release pip package
 on:
   workflow_dispatch:
     inputs:
-      release_name:
-        description: 'Name of the draft release to upload to'
+      tag_name:
+        description: 'Tag of the draft release to upload to'
         required: true
 
 permissions:
@@ -39,7 +39,7 @@ jobs:
         lfs: true
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -60,7 +60,7 @@ jobs:
 
     - name: Build wheel for Python ${{ matrix.python-version }}
       run: |
-        python3 -m build
+        python3 -m build --wheel
 
     - name: Get wheel file name
       run: |
@@ -71,32 +71,10 @@ jobs:
         fi
         echo "WHEEL_FILE=$(basename $WHEEL_FILE)" >> $GITHUB_ENV
 
-    - name: Get specified draft release
-      uses: actions/github-script@v6
-      with:
-        github-token: ${{secrets.GITHUB_TOKEN}}
-        script: |
-          const releaseName = '${{ github.event.inputs.release_name }}';
-          const { data: releases } = await github.rest.repos.listReleases({
-            owner: context.repo.owner,
-            repo: context.repo.repo
-          });
-          const draftRelease = releases.find(release => 
-            release.draft === true && release.name === releaseName
-          );
-          if (draftRelease) {
-            const fs = require('fs');
-            fs.appendFileSync(process.env.GITHUB_ENV, `upload_url=${draftRelease.upload_url}\n`);
-          } else {
-            core.setFailed(`No draft release found with name: ${releaseName}`);
-          }
-
     - name: Upload wheel as asset
-      uses: actions/upload-release-asset@v1
+      run: |
+        gh release upload ${{ github.event.inputs.tag_name }} \
+          dist/${{ env.WHEEL_FILE }} \
+          --clobber
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ env.upload_url }}
-        asset_path: dist/${{ env.WHEEL_FILE }}
-        asset_name: ${{ env.WHEEL_FILE }}
-        asset_content_type: application/zip
