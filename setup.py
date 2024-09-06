@@ -40,12 +40,33 @@ extensions = [
     ),
 ]
 
+# Ensure the scripts are available in the package directory to be included in the wheel
 os.makedirs('pysynap/scripts', exist_ok=True)
 shutil.copyfile('synap_convert.py', 'pysynap/scripts/synap_convert.py')
+shutil.copyfile('image_from_raw.py', 'pysynap/scripts/image_from_raw.py')
+shutil.copyfile('image_to_raw.py', 'pysynap/scripts/image_to_raw.py')
+shutil.copyfile('image_od.py', 'pysynap/scripts/image_od.py')
 
-# Read the contents of README file
-this_directory = Path(__file__).parent
-long_description = (this_directory / "README.rst").read_text()
+# Create synap_help.py script for handling help command
+with open('pysynap/scripts/synap_help.py', 'w') as f:
+    f.write("""\
+import sys
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'help':
+        print("SyNAP Toolkit\\n")
+        print("Usage:\\n\\tCOMMAND ARGS\\n\\tRun 'COMMAND --help' for more information on a command.\\n")
+        print("Commands:")
+        print("  synap_convert        - Convert and compile model")
+        print("  synap_image_from_raw - Convert image file to raw format")
+        print("  synap_image_to_raw   - Generate image file from raw format")
+        print("  synap_image_od       - Superimpose object-detection boxes to an image")
+    else:
+        print("Usage: synap help")
+
+if __name__ == "__main__":
+    main()
+""")
 
 setup(
     name='synap',
@@ -53,8 +74,6 @@ setup(
     author='Synaptics',
     author_email='meetdineshbhai.patel@synaptics.com',
     description='Synaptics AI Toolkit',
-    long_description=long_description,
-    long_description_content_type='text/markdown',
     packages=find_packages(exclude=['**/.*', '**/.git']),
     python_requires='>=3.10, <3.13',
     install_requires=requirements,
@@ -70,6 +89,10 @@ setup(
     entry_points={
         'console_scripts': [
             'synap_convert=pysynap.scripts.synap_convert:main',
+            'synap_image_from_raw=pysynap.scripts.image_from_raw:main',
+            'synap_image_to_raw=pysynap.scripts.image_to_raw:main',
+            'synap_image_od=pysynap.scripts.image_od:main',
+            'synap=pysynap.scripts.synap_help:main',
         ],
     },
 )

@@ -9,3 +9,5 @@ recursive-include pysynap/prebuilts/lib *
 recursive-include pysynap/prebuilts/pyarmor_runtime_001391 *
 recursive-include pysynap/prebuilts/vxk/ *
 recursive-include pysynap/external/ *
+
+global-exclude __pycache__/*.pyc

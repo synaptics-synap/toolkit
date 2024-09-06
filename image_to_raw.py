@@ -96,7 +96,7 @@ def image_to_raw(image_file, raw_filename, w, h, type):
         img_yuv.astype('uint8').tofile(raw_filename)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--src', help='Source image (.png or .jpg)')
     parser.add_argument('-o', '--dst', help='Destination raw file')
@@ -118,4 +118,5 @@ if __name__ == "__main__":
 
     image_to_raw(args.src, args.dst, w, h, args.format)
 
-   
+if __name__ == "__main__":
+    main()
