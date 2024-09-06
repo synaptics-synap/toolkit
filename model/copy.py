@@ -53,7 +53,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=f"python -m src.{Path(__file__).stem}", description=__doc__
+        prog=f"python -m model.copy", description=__doc__
     )
     group = parser.add_argument_group(
         "model selection",
