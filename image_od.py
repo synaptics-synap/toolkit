@@ -20,9 +20,33 @@ import sys
 import json
 import random
 import os.path
+import numpy as np
+
+def get_rand_color():
+    return [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
+
+def scale_mask(mask: np.ndarray, mask_w: int, mask_h: int, inp_w: int, inp_h: int):
+    """Reshape mask into 2D and scale to input image size"""
+    mask = mask.reshape((mask_h, mask_w))
+    return cv2.resize(mask, (inp_w, inp_h), interpolation=cv2.INTER_LINEAR)
+
+def overlay_mask(mask: np.ndarray, img: cv2.Mat, roi: tuple[int, int, int, int], thresh: float = 0, color: list[int] | None = None):
+    """Confine mask to bounding box and overlay on img"""
+    x, y, dx, dy = roi
+    mask[y: y + dy, x: x + dx] = mask[y: y + dy, x: x + dx] > thresh
+    colored_mask = np.zeros_like(img)
+    colored_mask[mask == 1] = color or get_rand_color()
+    return cv2.add(img, colored_mask)
+
+def add_mask(mask: np.ndarray, combined_mask: np.ndarray, roi: tuple[int, int, int, int], thresh: float = 0, color: list[int] | None = None):
+    """Confine mask to bounding box and add to combined mask"""
+    x, y, dx, dy = roi
+    mask[y: y + dy, x: x + dx] = mask[y: y + dy, x: x + dx] > thresh
+    combined_mask[mask == 1] = color or get_rand_color()
 
 def image_od(src, dst, json_od_result:str):
     img = cv2.imread(src)
+    inp_h, inp_w, _ = img.shape
     try:
         od_result = json.loads(json_od_result)
     except:
@@ -31,6 +55,34 @@ def image_od(src, dst, json_od_result:str):
     if not 'items' in od_result:
         print("Error: object-detection data not found in the input JSON")
         sys.exit(1)
+    
+    prev_mask = None
+    combined_mask = np.zeros_like(img)
+    # separate loop to prevent masks from affecting bounding box color
+    for i, detection in enumerate(od_result['items']):
+        bb = detection['bounding_box']
+        x1 = int(bb['origin']['x'])
+        y1 = int(bb['origin']['y'])
+        dx = int(bb['size']['x'])
+        dy = int(bb['size']['y'])
+        ci = detection['class_index']
+        try:
+            if detection['mask']['data']:
+                mask_h, mask_w = detection['mask']['height'], detection['mask']['width']
+                mask = np.array(detection['mask']['data'], dtype=np.float32)
+                if prev_mask is not None and np.array_equal(prev_mask, mask):
+                    print("Current mask same as previous mask")
+                prev_mask = mask
+                mask = scale_mask(mask, mask_w, mask_h, inp_w, inp_h)
+                add_mask(mask, combined_mask, (x1, y1, dx, dy))
+                # individually overlay mask on image and save a copy
+                # cv2.imwrite(f'mask_{i} (class {ci}).jpg', overlay_mask(mask, cv2.imread(src), (x1, y1, dx, dy)))
+        except KeyError:
+            print(f"No mask data for detection {i}")
+            continue
+    # overlay combined mask on image
+    combined_mask = np.clip(combined_mask, 0, 255)
+    img = cv2.add(img, combined_mask)
 
     print("#   Score  Class   Position        Size  Description     Landmarks")
     for i, detection in enumerate(od_result['items']):
