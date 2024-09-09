@@ -6,4 +6,5 @@ __pycache__/
 # model export
 dataset[s]/
 models/
+.export_cache/
 *.pt
