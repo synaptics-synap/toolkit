@@ -41,32 +41,10 @@ extensions = [
 ]
 
 # Ensure the scripts are available in the package directory to be included in the wheel
-os.makedirs('pysynap/scripts', exist_ok=True)
 shutil.copyfile('synap_convert.py', 'pysynap/scripts/synap_convert.py')
 shutil.copyfile('image_from_raw.py', 'pysynap/scripts/image_from_raw.py')
 shutil.copyfile('image_to_raw.py', 'pysynap/scripts/image_to_raw.py')
 shutil.copyfile('image_od.py', 'pysynap/scripts/image_od.py')
-
-# Create synap_help.py script for handling help command
-with open('pysynap/scripts/synap_help.py', 'w') as f:
-    f.write("""\
-import sys
-
-def main():
-    if len(sys.argv) > 1 and sys.argv[1] == 'help':
-        print("SyNAP Toolkit\\n")
-        print("Usage:\\n\\tCOMMAND ARGS\\n\\tRun 'COMMAND --help' for more information on a command.\\n")
-        print("Commands:")
-        print("  synap_convert        - Convert and compile model")
-        print("  synap_image_from_raw - Convert image file to raw format")
-        print("  synap_image_to_raw   - Generate image file from raw format")
-        print("  synap_image_od       - Superimpose object-detection boxes to an image")
-    else:
-        print("Usage: synap help")
-
-if __name__ == "__main__":
-    main()
-""")
 
 setup(
     name='synap',

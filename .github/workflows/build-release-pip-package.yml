@@ -43,13 +43,9 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Add __init__.py to scripts and prebuilts directories
+    - name: Add __init__.py to prebuilts dir
       run: |
-        mkdir -p pysynap/scripts
-        touch pysynap/scripts/__init__.py
         touch pysynap/prebuilts/__init__.py
-        touch pysynap/external/__init__.py
-        touch pysynap/external/tflite/__init__.py
       working-directory: ${{ github.workspace }}
 
     - name: Install dependencies
