@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import copy2
+from shutil import copy2, copytree
 from tempfile import TemporaryDirectory
 from time import sleep
 
@@ -20,6 +20,8 @@ __all__ = [
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
+CACHE_ROOT_DIR: str = f"{os.getcwd()}/.export_cache"
+
 @dataclass
 class ModelExportInfo:
     model_name: str
@@ -27,6 +29,10 @@ class ModelExportInfo:
     inp_height: int
     export_format: str
     saved_weights: Path | None
+
+    @property
+    def model_id(self) -> str:
+        return f"{self.model_name}_{self.inp_width}x{self.inp_height}"
 
     def export_filename(self, quant_type: str | None) -> str:
         return str(self) + self.__quant_type(quant_type) + f".{self.export_format}"
@@ -155,6 +161,7 @@ def __run_exporter(
     curr_wd = os.getcwd()
     with TemporaryDirectory() as temp_dir:
         os.chdir(temp_dir)
+        __fetch_from_cache(model_info.model_id, temp_dir)
         if model_info.saved_weights:
             model_info.saved_weights = Path(copy2(model_info.saved_weights, temp_dir))
         model_path: str = exporter.export_model()
@@ -171,7 +178,24 @@ def __run_exporter(
             print(
                 f"Saving model and metadata for {model_info.export_filename(quant_type)} ... complete"
             )
+        exporter.cleanup_export_files()
+        __update_cache(model_info.model_id, temp_dir)
     os.chdir(curr_wd)
+
+
+def __fetch_from_cache(model_id: str, model_files_dir: str) -> None:
+    if (model_cache := Path(CACHE_ROOT_DIR) / model_id).exists():
+        for f in model_cache.iterdir():
+            if f.is_dir():
+                copytree(model_files_dir, f, dirs_exist_ok=True)
+            elif f.is_file():
+                copy2(f, model_files_dir)
+
+
+def __update_cache(model_id: str, model_files_dir: str) -> None:
+    if not (model_cache := Path(CACHE_ROOT_DIR) / model_id).exists():
+        model_cache.mkdir(parents=True)
+    copytree(model_files_dir, model_cache, dirs_exist_ok=True)
 
 
 def export_and_save_models(
