@@ -7,45 +7,49 @@ from pathlib import Path
 from shutil import rmtree
 
 
-def cleanup(
-    export_formats: list[str],
-    remove_exported: bool,
-    remove_converted: bool,
-    export_dir: str,
-    convert_dir: str,
-) -> None:
-    files: list[Path] = []
-    dirs: list[Path] = []
-    if (runs_dir := Path(f"./runs")).exists():
-        dirs.append(runs_dir)
-    for f in Path(".").iterdir():
-        if f.is_dir() and "saved_model" in f.name:
-            dirs.append(f)
-        if f.is_file() and f.suffix.lstrip(".") in [*export_formats, "sh", "npy", "pt"]:
-            files.append(f)
-    if remove_exported and Path(export_dir).exists():
-        for f in Path(export_dir).iterdir():
-            if f.is_file() and f.suffix.lstrip(".") in [*export_formats, "yaml"]:
-                files.append(f)
-    if remove_converted and Path(convert_dir).exists():
-        for f in Path(convert_dir).iterdir():
-            if f.is_file():
-                files.append(f)
-            else:
-                dirs.append(f)
-    
-    to_delete: list[Path] = [f.resolve() for f in files + dirs]
+def cleanup(to_delete: list[Path], bypass_conf: bool = True) -> None:
+    to_delete = [f.resolve() for f in to_delete]
     if not to_delete:
         print("No files to clean up")
         sys.exit()
     print("The following files and directories will be deleted:\n")
     print(*to_delete, sep=f"\n")
-    if input("\nContinue? (Y/[n]): ") in ("Y", "y"):
+    if bypass_conf or (input("\nContinue? (Y/[n]): ") in ("Y", "y")):
         for f in to_delete:
             if f.is_file():
                 f.unlink()
             else:
                 rmtree(f)
+
+
+def get_model_convert_files(convert_dir: str) -> list[Path]:
+    files: list[Path] = []
+    dirs: list[Path] = []
+    if Path(convert_dir).exists():
+        for f in Path(convert_dir).iterdir():
+            if f.is_file():
+                files.append(f)
+            else:
+                dirs.append(f)
+    return files
+
+
+def get_model_export_files(export_dir: str, export_formats: list[str]) -> list[Path]:
+    files: list[Path] = []
+    if Path(export_dir).exists():
+        for f in Path(export_dir).iterdir():
+            if f.is_file() and f.suffix.lstrip(".") in [*export_formats, "yaml"]:
+                files.append(f)
+    return files
+
+
+def main() -> None:
+    to_delete: list[Path] = []
+    if args.converted:
+        to_delete += get_model_convert_files(args.convert_dir)
+    if args.exported:
+        to_delete += get_model_export_files(args.export_dir, args.export_formats)
+    cleanup(to_delete, args.yes)
 
 
 if __name__ == "__main__":
@@ -91,13 +95,13 @@ if __name__ == "__main__":
         metavar="DIR",
         help="Converted models directory (default: %(default)s)",
     )
+    parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        default=False,
+        help="Bypass cleanup confirmation prompt"
+    )
     args = parser.parse_args()
     if args.all:
         args.exported, args.converted = True, True
-    cleanup(
-        args.export_formats,
-        args.exported,
-        args.converted,
-        args.export_dir,
-        args.convert_dir,
-    )
+    main()
