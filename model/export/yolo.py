@@ -5,6 +5,7 @@ from itertools import product
 from logging import ERROR
 from os import getcwd
 from pathlib import Path
+from shutil import rmtree
 from typing import Any
 
 from ultralytics import YOLO
@@ -55,6 +56,22 @@ class YOLOModelExporter(ModelExporter):
             output_info["format"] = f"{self.get_out_fmt_name()} w_scale={self.model_info.inp_width} h_scale={self.model_info.inp_height} bb_normalized={bb_norm}"
             output_info["dequantize"] = True
         return outputs_info
+    
+    def cleanup_export_files(self) -> None:
+        saved_weights = self.model_info.saved_weights.name if self.model_info.saved_weights else None
+        work_dir: Path = Path(".")
+        if (runs_dir := work_dir / "runs").exists():
+            rmtree(runs_dir)
+        for f in work_dir.iterdir():
+            if f.is_dir():
+                rmtree(f)
+            if f.is_file():
+                if f.suffix.lstrip(".") == "npy":
+                    pass
+                elif f.suffix.lstrip(".") == "pt" and f.name != saved_weights:
+                    pass
+                else:
+                    f.unlink()
 
 
 def main() -> None:

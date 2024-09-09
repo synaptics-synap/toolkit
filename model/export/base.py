@@ -141,6 +141,9 @@ class ModelExporter(ABC):
         else:
             print(f"Metadata file not generated for {self.model_info}, please create manually")
 
+    def cleanup_export_files(self) -> None:
+        pass
+
 
 def __run_exporter(
     exporter: ModelExporter,
