@@ -106,7 +106,7 @@ def image_od(src, dst, json_od_result:str):
     cv2.imwrite(dst, img)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--src', help='Source image (.png or .jpg)')
     parser.add_argument('-o', '--dst', help='Destination image file')
@@ -123,6 +123,6 @@ if __name__ == "__main__":
         sys.exit(1)
     od_result = od_result[json_begin:]
     image_od(args.src, args.dst, od_result)
-    
 
-   
+if __name__ == "__main__":
+    main()

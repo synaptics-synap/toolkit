@@ -103,8 +103,7 @@ def image_from_raw(raw_filename, width, height, dst:str, type:str, dtype:str):
     bgr = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
     cv2.imwrite(dst, bgr)
 
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--src', help='Source raw image file')
     parser.add_argument('-s', '--size', help='Source image pixel size: WxH')
@@ -135,3 +134,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     image_from_raw(args.src, w, h, args.dst, args.format, args.dtype)
+
+if __name__ == "__main__":
+    main()
