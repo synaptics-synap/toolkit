@@ -106,8 +106,10 @@ def image_od(src, dst, json_od_result:str):
     cv2.imwrite(dst, img)
 
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
     parser.add_argument('-i', '--src', help='Source image (.png or .jpg)')
     parser.add_argument('-o', '--dst', help='Destination image file')
     args = parser.parse_args()
