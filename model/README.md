@@ -8,7 +8,7 @@ The following models are currently supported:
 | [YOLOv9](https://docs.ultralytics.com/models/yolov9/) | [export/yolo.py](/model/export/yolo.py) |
 
 ## YOLO Export Quickstart
-This tutorial will go through exporting the YOLOv8 segmentation (small) model into two input sizes (640x353, 224x224) and two quantization types (uint8, float16). The quantization dataset used is [`coco8-seg`](https://docs.ultralytics.com/datasets/segment/coco8-seg/) and is assumed to be located at `"/home/$USER/synaptics-synap/toolkit/datasets/coco8-seg/*.jpg"`. The board used is the Astra SL1680 with firmware v1.1.0.
+This tutorial will go through exporting the YOLOv8 segmentation (small) model into two input sizes (640x352, 224x224) and two quantization types (uint8, float16). The quantization dataset used is [`coco8-seg`](https://docs.ultralytics.com/datasets/segment/coco8-seg/) and is assumed to be located at `"/home/$USER/synaptics-synap/toolkit/datasets/coco8-seg/*.jpg"`. The board used is the Astra SL1680 with firmware v1.1.0.
 
 ### 1. Export YOLOv8 to TFLite models
 ```
