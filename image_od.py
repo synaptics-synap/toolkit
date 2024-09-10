@@ -127,7 +127,7 @@ def add_mask(mask: np.ndarray, combined_mask: np.ndarray, roi: tuple[int, int, i
     mask[y: y + dy, x: x + dx] = mask[y: y + dy, x: x + dx] > thresh
     combined_mask[mask == 1] = color or get_rand_color()
 
-def image_od(src, dst, json_od_result:str, mask_colors: dict):
+def image_od(src, dst, json_od_result:str, mask_colors: dict, verbose: bool):
     img = cv2.imread(src)
     inp_h, inp_w, _ = img.shape
     try:
@@ -143,13 +143,13 @@ def image_od(src, dst, json_od_result:str, mask_colors: dict):
     combined_mask = np.zeros_like(img)
     # separate loop to prevent masks from affecting bounding box color
     for i, detection in enumerate(od_result['items']):
-        bb = detection['bounding_box']
-        x1 = int(bb['origin']['x'])
-        y1 = int(bb['origin']['y'])
-        dx = int(bb['size']['x'])
-        dy = int(bb['size']['y'])
-        ci = detection['class_index']
         try:
+            bb = detection['bounding_box']
+            x1 = int(bb['origin']['x'])
+            y1 = int(bb['origin']['y'])
+            dx = int(bb['size']['x'])
+            dy = int(bb['size']['y'])
+            ci = detection['class_index']
             if detection['mask']['data']:
                 mask_h, mask_w = detection['mask']['height'], detection['mask']['width']
                 mask = np.array(detection['mask']['data'], dtype=np.float32)
@@ -161,8 +161,9 @@ def image_od(src, dst, json_od_result:str, mask_colors: dict):
                 add_mask(mask, combined_mask, (x1, y1, dx, dy), color=mask_color)
                 # individually overlay mask on image and save a copy
                 # cv2.imwrite(f'mask_{i} (class {ci}).jpg', overlay_mask(mask, cv2.imread(src), (x1, y1, dx, dy), color=mask_color))
-        except KeyError:
-            print(f"No mask data for detection {i}")
+        except KeyError as e:
+            if verbose:
+                print(f"WARNING: Missing {e} data for detection {i}")
             continue
     # overlay combined mask on image
     combined_mask = np.clip(combined_mask, 0, 255)
@@ -170,23 +171,28 @@ def image_od(src, dst, json_od_result:str, mask_colors: dict):
 
     print("#   Score  Class   Position        Size  Description     Landmarks")
     for i, detection in enumerate(od_result['items']):
-        bb = detection['bounding_box']
-        x1 = int(bb['origin']['x'])
-        y1 = int(bb['origin']['y'])
-        dx = int(bb['size']['x'])
-        dy = int(bb['size']['y'])
-        confidence = detection['confidence']
-        ci = detection['class_index']
-        lms = detection['landmarks']['points']
-        print(f"{i:<5}{confidence:.2f}{ci:>7}  {x1:4},{y1:4}   {dx:4},{dy:4}                  ", end='')
-        print(" ".join([f"{lm['x']},{lm['y']}" for lm in lms]))
-        color = (0, 255, 128)
-        cv2.rectangle(img, (x1, y1), (x1 + dx, y1 + dy), color, 2)
-        cv2.putText(img, str(ci) + f": {confidence:.2f}", (x1, y1-3), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color)[0]
-        for lm in lms:
-            lmx = int(lm['x'])
-            lmy = int(lm['y'])
-            cv2.rectangle(img, (lmx, lmy), (lmx+2, lmy+2), color, 2)
+        try:
+            bb = detection['bounding_box']
+            x1 = int(bb['origin']['x'])
+            y1 = int(bb['origin']['y'])
+            dx = int(bb['size']['x'])
+            dy = int(bb['size']['y'])
+            confidence = detection['confidence']
+            ci = detection['class_index']
+            lms = detection['landmarks']['points']
+            print(f"{i:<5}{confidence:.2f}{ci:>7}  {x1:4},{y1:4}   {dx:4},{dy:4}                  ", end='')
+            print(" ".join([f"{lm['x']},{lm['y']}" for lm in lms]))
+            color = (0, 255, 128)
+            cv2.rectangle(img, (x1, y1), (x1 + dx, y1 + dy), color, 2)
+            cv2.putText(img, str(ci) + f": {confidence:.2f}", (x1, y1-3), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color)[0]
+            for lm in lms:
+                lmx = int(lm['x'])
+                lmy = int(lm['y'])
+                cv2.rectangle(img, (lmx, lmy), (lmx+2, lmy+2), color, 2)
+        except KeyError as e:
+            if verbose:
+                print(f"WARNING: Missing {e} data for detection {i}")
+            continue
     cv2.imwrite(dst, img)
 
 
@@ -195,6 +201,7 @@ def main():
     parser.add_argument('-i', '--src', help='Source image (.png or .jpg)')
     parser.add_argument('-o', '--dst', help='Destination image file')
     parser.add_argument('--mask_colors', help='JSON file containing segmentation mask colors for COCO based models')
+    parser.add_argument('--verbose', action="store_true", default=False, help="Enable verbose logging")
     args = parser.parse_args()
     od_result = sys.stdin.read()
 
@@ -232,7 +239,7 @@ def main():
     if mask_colors is None:
         mask_colors = default_mask_colors
 
-    image_od(args.src, args.dst, od_result, mask_colors)
+    image_od(args.src, args.dst, od_result, mask_colors, args.verbose)
 
 if __name__ == "__main__":
     main()
