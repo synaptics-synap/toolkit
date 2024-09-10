@@ -127,7 +127,7 @@ def add_mask(mask: np.ndarray, combined_mask: np.ndarray, roi: tuple[int, int, i
     mask[y: y + dy, x: x + dx] = mask[y: y + dy, x: x + dx] > thresh
     combined_mask[mask == 1] = color or get_rand_color()
 
-def image_od(src, dst, json_od_result:str):
+def image_od(src, dst, json_od_result:str, mask_colors: dict):
     img = cv2.imread(src)
     inp_h, inp_w, _ = img.shape
     try:
@@ -157,9 +157,10 @@ def image_od(src, dst, json_od_result:str):
                     print("Current mask same as previous mask")
                 prev_mask = mask
                 mask = scale_mask(mask, mask_w, mask_h, inp_w, inp_h)
-                add_mask(mask, combined_mask, (x1, y1, dx, dy))
+                mask_color = mask_colors[ci] if mask_colors else None
+                add_mask(mask, combined_mask, (x1, y1, dx, dy), color=mask_color)
                 # individually overlay mask on image and save a copy
-                # cv2.imwrite(f'mask_{i} (class {ci}).jpg', overlay_mask(mask, cv2.imread(src), (x1, y1, dx, dy)))
+                # cv2.imwrite(f'mask_{i} (class {ci}).jpg', overlay_mask(mask, cv2.imread(src), (x1, y1, dx, dy), color=mask_color))
         except KeyError:
             print(f"No mask data for detection {i}")
             continue
@@ -193,6 +194,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--src', help='Source image (.png or .jpg)')
     parser.add_argument('-o', '--dst', help='Destination image file')
+    parser.add_argument('--mask_colors', help='JSON file containing segmentation mask colors for COCO based models')
     args = parser.parse_args()
     od_result = sys.stdin.read()
 
@@ -205,7 +207,32 @@ def main():
         print("Error: JSON data not found in the input.")
         sys.exit(1)
     od_result = od_result[json_begin:]
-    image_od(args.src, args.dst, od_result)
+
+    def is_valid_color(color):
+        return (
+            isinstance(color, list) and 
+            len(color) == 3 and 
+            all(isinstance(c, int) and 0 <= c <= 255 for c in color)
+        )
+
+    mask_colors = None
+    if args.mask_colors:
+        try:
+            with open(args.mask_colors, "r") as f:
+                mask_colors = json.load(f)
+                mask_colors = {int(k): v for k, v in mask_colors.items()}
+                if set(mask_colors.keys()) != (expected_classes := set(range(80))):
+                    raise ValueError(f"\"{args.mask_colors}\" missing classes or has extra classes. Expected classes: {expected_classes}")
+                if not(all(is_valid_color(color) for color in mask_colors.values())):
+                    raise ValueError(f"Erroneous color values in \"{args.mask_colors}\"")
+        except ValueError as e:
+            print(f"Error parsing mask colors: {e.args[0]}")
+        except (FileNotFoundError, json.JSONDecodeError):
+            print(f"Invalid mask colors file \"{args.mask_colors}\"")
+    if mask_colors is None:
+        mask_colors = default_mask_colors
+
+    image_od(args.src, args.dst, od_result, mask_colors)
 
 if __name__ == "__main__":
     main()
