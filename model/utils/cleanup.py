@@ -22,7 +22,7 @@ def cleanup(to_delete: list[Path], bypass_conf: bool = True) -> None:
                 rmtree(f)
 
 
-def get_model_convert_files(convert_dir: str) -> list[Path]:
+def get_files_and_dirs(convert_dir: str) -> list[Path]:
     files: list[Path] = []
     dirs: list[Path] = []
     if Path(convert_dir).exists():
@@ -31,7 +31,7 @@ def get_model_convert_files(convert_dir: str) -> list[Path]:
                 files.append(f)
             else:
                 dirs.append(f)
-    return files
+    return files + dirs
 
 
 def get_model_export_files(export_dir: str, export_formats: list[str]) -> list[Path]:
@@ -45,8 +45,10 @@ def get_model_export_files(export_dir: str, export_formats: list[str]) -> list[P
 
 def main() -> None:
     to_delete: list[Path] = []
+    if args.cache:
+        to_delete += get_files_and_dirs(f"{os.getcwd()}/.export_cache")
     if args.converted:
-        to_delete += get_model_convert_files(args.convert_dir)
+        to_delete += get_files_and_dirs(args.convert_dir)
     if args.exported:
         to_delete += get_model_export_files(args.export_dir, args.export_formats)
     cleanup(to_delete, args.yes)
@@ -74,6 +76,12 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
         help="Remove converted models",
+    )
+    parser.add_argument(
+        "--cache",
+        action="store_true",
+        default=False,
+        help="Remove cached model export data",
     )
     parser.add_argument(
         "--all",
