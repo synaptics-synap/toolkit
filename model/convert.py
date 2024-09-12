@@ -16,13 +16,12 @@ def convert_model(
     model_name: str = model_path.stem
     meta_path: Path = model_path.parent / f"{model_name}.yaml"
     out_dir: Path = convert_dir / f"{model_name}"
-    docker_cmd: str = (
-        "docker run -i --rm -u $(id -u):$(id -g) -v $HOME:$HOME -w $(pwd) ghcr.io/synaptics-synap/toolkit:3.1.0"
-    )
     conv_cmd: str = (
-        docker_cmd
-        + " "
-        + f'convert --model "{model_path.resolve()}" --meta "{meta_path.resolve()}" --target {target} --out-dir "{out_dir.resolve()}"'
+        "synap_convert"
+        + f' --model "{model_path.resolve()}"' 
+        + f' --meta "{meta_path.resolve()}"' 
+        + f" --target {target}" 
+        + f' --out-dir "{out_dir.resolve()}"'
     )
     if profile:
         conv_cmd += " --profiling"
