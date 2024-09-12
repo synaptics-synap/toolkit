@@ -32,5 +32,5 @@ elif [ $# -gt 1 ]; then
         profile_and_save_res
     done
 else
-    echo "No models found for benchmarking"
+    echo "Invalid models path"
 fi
