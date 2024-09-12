@@ -54,7 +54,7 @@ def scale_mask(mask: np.ndarray, mask_w: int, mask_h: int, inp_w: int, inp_h: in
     mask = mask.reshape((mask_h, mask_w))
     return cv2.resize(mask, (inp_w, inp_h), interpolation=cv2.INTER_LINEAR)
 
-def overlay_mask(mask: np.ndarray, img: cv2.Mat, roi: tuple[int, int, int, int], thresh: float = 0, color: list[int] | None = None):
+def overlay_mask(mask: np.ndarray, img: np.ndarray, roi: tuple[int, int, int, int], thresh: float = 0, color: list[int] | None = None):
     """Confine mask to bounding box and overlay on img"""
     x, y, dx, dy = roi
     mask[y: y + dy, x: x + dx] = mask[y: y + dy, x: x + dx] > thresh
