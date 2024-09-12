@@ -11,7 +11,7 @@ The following models are currently supported:
 This tutorial will go through exporting the YOLOv8 segmentation (small) model into two input sizes (640x352, 224x224) and two quantization types (uint8, float16). The quantization dataset used is [`coco8-seg`](https://docs.ultralytics.com/datasets/segment/coco8-seg/) and is assumed to be located at `"/home/$USER/synaptics-synap/toolkit/datasets/coco8-seg/*.jpg"`. The board used is the Astra SL1680 with firmware v1.1.0.
 
 ### 1. Export YOLOv8 to TFLite models
-```
+```sh
 python -m model.export.yolo \
     --models yolov8s-seg \
     --input_sizes 640x352 224x224 \
@@ -35,7 +35,7 @@ yolov8s-seg_640x352_tflite_uint8.yaml
 Now would be a good time to modify the conversion metafiles if needed. We'll be skipping that step for this tutorial and proceed directly to SyNAP conversion.
 
 ### 2. Converting TFLite models to SyNAP
-```
+```sh
 python -m model.convert \
     --all \
     --target SL1680
@@ -64,7 +64,11 @@ models/converted
 This step is identical to running `synap convert` manually on every model in `models/exported`.
 
 ### 3. Copying SyNAP models to board
+```sh
+python -m model.copy --all
 ```
+Or via SSH:
+```sh
 python -m model.copy \
     --all \
     --board_ip <IP address>
@@ -74,7 +78,11 @@ python -m model.copy \
 The above command will copy all SyNAP models from `models/converted` to the board at `root@<IP address>:/home/root/models` using SSH. The destination directory will be created if it doesn't exist.
 
 ### 4. [Optional] Profile copied models with `synap_cli`
+```sh
+python -m model.copy --all
 ```
+Or via SSH:
+```sh
 python -m model.profile \
     --all \
     --board_ip <IP address>

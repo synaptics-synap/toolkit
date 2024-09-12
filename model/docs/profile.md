@@ -9,7 +9,8 @@ The profiling results are from running `synap_cli` with `random` input and 10 in
 
 ## Profile options
 To profile models, run `python -m model.profile`. The following options are available:
-- `--board_ip`: The IP address of the board to profile models on.
+- `--serial`: The device serial for ADB. By default ADB will use the first connected device it finds, use this to specify a different device.
+- `--board_ip`: The IP address of the board to profile models on. If provided, profiling will be done over SSH instead of ADB.
 - `--models_dir`: Directory containing the models to profile. Default is `/home/root/models`.
 - `--all | --models`: Select which models to copy from `--copy_dir`. Only one of these options may be specified at a time.
   - `--all`: Profile all models.
@@ -22,22 +23,20 @@ A summarized version of this information is available via `python -m model.conve
 
 ## Profile examples
 1. Profile all models:
-```
+```sh
 python -m model.profile \
-    --all \
-    --board_ip 10.3.10.78
+    --all
 ```
-2. Profile only models with 224x224 input size:
-```
+2. Profile only models with 224x224 input size, over SSH:
+```sh
 python -m model.profile \
     --models *224x224* \
-    --board_ip 10.3.10.78
+    --board_ip <IP address>
 ```
 3. Profile models from a different directory:
-```
+```sh
 python -m model.profile \
     --all \
-    --board_ip 10.3.10.78 \
     --models_dir /tmp
 ```
 
