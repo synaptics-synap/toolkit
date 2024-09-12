@@ -1,19 +1,14 @@
 """Profile converted models on a development board with synap_cli"""
 
 import argparse
-from pathlib import Path
 
 from model.utils.temp_script import TempScript
 
-# TODO: add ADB support
-# TODO: export results as CSV
-def profile_models(
-    model_names: list[str], models_dir: str, board_ip: str, profile_all: bool
+def profile_models_ssh(
+    model_names: list[str], models_dir: str, board_ip: str | None, profile_all: bool
 ) -> None:
-    cp_bench_cmd: str = (
-        f"scp model/scripts/benchmark.sh root@{board_ip}:{models_dir}/benchmark.sh"
-    )
-    profile_cmd: str = f"ssh -T root@{board_ip} << EOF\n"
+    cp_bench_cmd = f"scp model/scripts/benchmark.sh root@{board_ip}:{models_dir}/benchmark.sh"
+    profile_cmd = f"ssh -T root@{board_ip} << EOF\n"
     profile_cmd += f"cd {models_dir}\nchmod u+x benchmark.sh\n"
     if profile_all:
         profile_cmd += "./benchmark.sh ."
@@ -23,6 +18,24 @@ def profile_models(
         )
     profile_cmd += "\ncat results.txt\nEOF\n"
     se = TempScript(cp_bench_cmd, profile_cmd)
+    se.run(success_msg=None, error_msg="Profiling failed")
+
+
+def profile_models_adb(
+    model_names: list[str], models_dir: str, serial: str, profile_all: bool
+) -> None:
+    adb = f"adb -s {serial}" if serial else "adb"
+    cp_bench_cmd = f"{adb} push model/scripts/benchmark.sh {models_dir}/benchmark.sh > /dev/null"
+    chmod_cmd = f"{adb} shell chmod u+x {models_dir}/benchmark.sh"
+    if profile_all:
+        profile_cmd = f"{adb} shell {models_dir}/benchmark.sh {models_dir}"
+    else:
+        profile_cmd = f"{adb} shell {models_dir}/benchmark.sh " + " ".join(
+            f"{models_dir}/{model_name}.synap" for model_name in set(model_names)
+        )
+    mv_res_cmd = f"{adb} shell mv /results.txt {models_dir}/results.txt"
+    cat_res_cmd = f"{adb} shell cat {models_dir}/results.txt"
+    se = TempScript(cp_bench_cmd, chmod_cmd, profile_cmd, mv_res_cmd, cat_res_cmd)
     se.run(success_msg=None, error_msg="Profiling failed")
 
 
@@ -47,11 +60,15 @@ if __name__ == "__main__":
         help="Profile all models",
     )
     parser.add_argument(
+        "--serial",
+        type=str,
+        help="Specify serial for ADB, will use first detected device otherwise",
+    )
+    parser.add_argument(
         "--board_ip",
         type=str,
-        required=True,
         metavar="ADDR",
-        help="Dev board IP address",
+        help="Dev board IP address, for profiling with SSH instead of ADB",
     )
     parser.add_argument(
         "--models_dir",
@@ -61,4 +78,7 @@ if __name__ == "__main__":
         help="Profile models in this directory (default: %(default)s)",
     )
     args = parser.parse_args()
-    profile_models(args.models, args.models_dir, args.board_ip, args.all)
+    if args.board_ip:
+        profile_models_ssh(args.models, args.models_dir, args.board_ip, args.all)
+    else:
+        profile_models_adb(args.models, args.models_dir, args.serial, args.all)
