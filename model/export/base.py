@@ -60,27 +60,23 @@ class ModelExporter(ABC):
 
     def generate_input_metadata(self, model_path: str) -> list[dict]:
         if self.model_info.export_format == "onnx":
-            inputs_info = get_onnx_inp_info(model_path)
+            return get_onnx_layer_info(model_path, "input")
         elif self.model_info.export_format == "tflite":
-            inputs_info = get_tflite_inp_info(model_path)
+            return get_tflite_layer_info(model_path, "input")
         else:
             raise ValueError(
                 f'Metadata generation not available for model type "{self.model_info.export_format}"'
             )
-        return inputs_info
     
     def generate_output_metadata(self, model_path: str) -> list[dict]:
-        if self.model_info.export_format == "tflite":
-            n_outputs = get_tflite_num_outputs(model_path)
-        elif self.model_info.export_format == "onnx":
-            n_outputs = get_onnx_num_outputs(model_path)
+        if self.model_info.export_format == "onnx":
+            return get_onnx_layer_info(model_path, "output")
+        elif self.model_info.export_format == "tflite":
+            return get_tflite_layer_info(model_path, "output")
         else:
             raise ValueError(
                 f'Metadata generation not available for model type "{self.model_info.export_format}"'
             )
-        return [
-            {} for _ in range(n_outputs)
-        ]
     
     def generate_quant_metadata(self, quant_type: str | None, quant_datasets: list[str] | None) -> dict[str, str]:
         quant_info: dict[str, str] = {}
