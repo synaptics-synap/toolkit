@@ -1,50 +1,53 @@
+from typing import Any, Literal
+
 import onnx
 import tensorflow.lite as tf_lite
 from google.protobuf.json_format import MessageToDict
 
 
 __all__ = [
-    "get_onnx_inp_info",
-    "get_tflite_inp_info",
-    "get_onnx_num_outputs",
-    "get_tflite_num_outputs",
+    "get_onnx_layer_info",
+    "get_tflite_layer_info",
 ]
 
 
-def get_onnx_inp_info(model_path: str) -> list[dict[str, str | int]]:
-    inputs_info = []
+def get_onnx_layer_info(
+    model_path: str,
+    layer_name: Literal["input", "output"],
+) -> list[dict[str, Any]]:
+    if layer_name not in ("input", "output"):
+        raise ValueError("Layer name must be one of ('input', 'output')")
+    layer_info = []
     model = onnx.load(model_path)
-    for _input in model.graph.input:
-        inp_info = {}
-        inp_info["name"] = _input.name
-        dim = _input.type.tensor_type.shape.dim
-        inp_shape = [int(MessageToDict(d).get("dimValue")) for d in dim]
-        inp_info["shape"] = str(inp_shape)
-        inputs_info.append(inp_info)
-    return inputs_info
+    layer = model.graph.input if layer_name == "input" else model.graph.output
+    for tensor in layer:
+        tensor_info = {}
+        tensor_info["name"] = tensor.name
+        dim = tensor.type.tensor_type.shape.dim
+        tensor_shape = [int(MessageToDict(d).get("dimValue")) for d in dim]
+        tensor_info["shape"] = str(tensor_shape)
+        layer_info.append(tensor_info)
+    return layer_info
 
 
-def get_tflite_inp_info(model_path: str) -> list[dict[str, str | int]]:
-    inputs_info = []
+def get_tflite_layer_info(
+    model_path: str,
+    layer_name: Literal["input", "output"],
+) -> list[dict[str, Any]]:
+    if layer_name not in ("input", "output"):
+        raise ValueError("Layer name must be one of ('input', 'output')")
+    layer_info = []
     interpreter = tf_lite.Interpreter(model_path=model_path)
-    for _input in interpreter.get_input_details():
-        inp_info = {}
-        inp_info["name"] = str(_input["name"])
-        inp_shape = list(_input["shape"])
-        inp_info["shape"] = str(inp_shape)
-        inputs_info.append(inp_info)
-    return inputs_info
-
-
-def get_onnx_num_outputs(model_path: str) -> int:
-    model = onnx.load(model_path)
-    return len(model.graph.output)
-
-
-def get_tflite_num_outputs(model_path: str) -> int:
-    interpreter = tf_lite.Interpreter(model_path)
-    return len(interpreter.get_output_details())
+    layer = interpreter.get_input_details() if layer_name == "input" else interpreter.get_output_details()
+    for tensor in layer:
+        tensor_info = {}
+        tensor_info["name"] = str(tensor["name"])
+        tensor_shape = list(tensor["shape"])
+        tensor_info["shape"] = str(tensor_shape)
+        layer_info.append(tensor_info)
+    return layer_info
 
 
 if __name__ == "__main__":
-    pass
+    # print(*get_tflite_input_info("/home/deep5201/synaptics-synap/toolkit/models/exported/yolov8n-seg_640x352_tflite.tflite"), sep="\n")
+    print(*get_onnx_layer_info("/home/deep5201/synaptics-synap/toolkit/models/exported/yolov8n-seg_640x352_onnx.onnx"), sep="\n")
