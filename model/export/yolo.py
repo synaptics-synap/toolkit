@@ -42,19 +42,21 @@ class YOLOModelExporter(ModelExporter):
         )
         return export_path
     
-    def generate_input_metadata(self, model_path: str) -> list[dict]:
-        inputs_info: list[dict] = super().generate_input_metadata(model_path)
-        for input_info in inputs_info:
-            input_info["format"] = "rgb keep_proportions=1"
-            input_info["scale"] = 255
+    def generate_input_metadata(self, model_path: str) -> list[dict] | None:
+        inputs_info: list[dict] | None = super().generate_input_metadata(model_path)
+        if inputs_info is not None:
+            for input_info in inputs_info:
+                input_info["format"] = "rgb keep_proportions=1"
+                input_info["scale"] = 255
         return inputs_info
     
     def generate_output_metadata(self, model_path: str) -> list[dict] | None:
-        outputs_info: list[dict] = super().generate_output_metadata(model_path)
-        bb_norm: int = 1 if self.model_info.export_format != "onnx" else 0
-        for output_info in outputs_info:
-            output_info["format"] = f"{self.get_out_fmt_name()} w_scale={self.model_info.inp_width} h_scale={self.model_info.inp_height} bb_normalized={bb_norm}"
-            output_info["dequantize"] = True
+        outputs_info: list[dict] | None = super().generate_output_metadata(model_path)
+        if outputs_info is not None:
+            bb_norm: int = 1 if self.model_info.export_format != "onnx" else 0
+            for output_info in outputs_info:
+                output_info["format"] = f"{self.get_out_fmt_name()} w_scale={self.model_info.inp_width} h_scale={self.model_info.inp_height} bb_normalized={bb_norm}"
+                output_info["dequantize"] = True
         return outputs_info
     
     def cleanup_export_files(self) -> None:

@@ -58,31 +58,50 @@ class ModelExporter(ABC):
     def export_model(self) -> str:
         ...
 
-    def generate_input_metadata(self, model_path: str) -> list[dict]:
+    @staticmethod
+    def check_metadata(metadata: dict[str, list | dict]) -> CommentedMap:
+        commented_metadata = CommentedMap(metadata)
+        for section, data in commented_metadata.items():
+            if data is None:
+                commented_metadata.yaml_set_comment_before_after_key(
+                    section,
+                    before=(
+                        f"{section.capitalize()} metadata missing\n"
+                        "See guide on manually adding metadata: https://synaptics-synap.github.io/doc/manual/working_with_models.html#conversion-metafile"
+                    ),
+                )
+            elif not data:
+                del commented_metadata[section]
+
+        return commented_metadata
+
+    def generate_input_metadata(self, model_path: str) -> list[dict] | None:
         if self.model_info.export_format == "onnx":
             return get_onnx_layer_info(model_path, "input")
         elif self.model_info.export_format == "tflite":
             return get_tflite_layer_info(model_path, "input")
         else:
-            raise ValueError(
-                f'Metadata generation not available for model type "{self.model_info.export_format}"'
+            print(
+                f'WARNING: Input metadata generation not available for model type "{self.model_info.export_format}"'
             )
+            return None
     
-    def generate_output_metadata(self, model_path: str) -> list[dict]:
+    def generate_output_metadata(self, model_path: str) -> list[dict] | None:
         if self.model_info.export_format == "onnx":
             return get_onnx_layer_info(model_path, "output")
         elif self.model_info.export_format == "tflite":
             return get_tflite_layer_info(model_path, "output")
         else:
-            raise ValueError(
-                f'Metadata generation not available for model type "{self.model_info.export_format}"'
+            print(
+                f'WARNING: Output metadata generation not available for model type "{self.model_info.export_format}"'
             )
+            return None
     
     def generate_quant_metadata(self, quant_type: str | None, quant_datasets: list[str] | None) -> dict[str, str]:
         quant_info: dict[str, str] = {}
         if quant_type and quant_type != "float16":
             if not quant_datasets:
-                raise ValueError("Quantization dataset not provided")
+                raise ValueError(f"Quantization dataset not provided for quantization type {quant_type}")
             if quant_type in ("uint8", "int8", "int16"):
                 quant_info["data_type"] = quant_type
                 quant_info["scheme"] = (
@@ -97,19 +116,11 @@ class ModelExporter(ABC):
     
     def generate_metadata(
         self, model_path: str, quant_type: str | None = None, quant_datasets: list[str] | None = None
-    ) -> dict[str, list | dict] | None:
-        try:
-            inputs_info: list[dict] = self.generate_input_metadata(model_path)
-            outputs_info: list[dict] = self.generate_output_metadata(model_path)
-            quant_info: dict[str, str] = self.generate_quant_metadata(quant_type, quant_datasets)
-        except ValueError as e:
-            print(f"ERROR: Couldn't generate metadata: {e.args[0]}")
-            return None
-        metadata: dict[str, list | dict] = {}
-        metadata["inputs"] = inputs_info
-        metadata["outputs"] = outputs_info
-        if quant_info:
-            metadata["quantization"] = quant_info
+    ) -> dict[str, list | dict | None]:
+        metadata: dict[str, list | dict | None] = {}
+        metadata["inputs"] = self.generate_input_metadata(model_path)
+        metadata["outputs"] = self.generate_output_metadata(model_path)
+        metadata["quantization"] = self.generate_quant_metadata(quant_type, quant_datasets)
         return metadata
     
     def save_exported_model(
@@ -131,15 +142,16 @@ class ModelExporter(ABC):
         copy2(model_path, export_path)
         # print(f'Exported model "{model_path}" copied to "{export_path}"')
         if metadata:
-            if quant_type == "mixed":
-                metadata["quantization"] = CommentedMap(metadata["quantization"])
+            commented_metadata = self.check_metadata(metadata)
+            if commented_metadata.get("quantization") and quant_type == "mixed":
+                metadata["quantization"] = CommentedMap(commented_metadata["quantization"])
                 metadata["quantization"].yaml_set_comment_before_after_key("data_type", after="add mixed quantzation layers here")
             with open(
                 f"{export_dir}/{self.model_info.yaml_filename(quant_type)}", "w"
             ) as f:
                 yaml = YAML()
                 yaml.default_flow_style = False
-                yaml.dump(metadata, f, transform=tr_yaml)
+                yaml.dump(commented_metadata, f, transform=tr_yaml)
         else:
             print(f"Metadata file not generated for {self.model_info}, please create manually")
 
