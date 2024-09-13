@@ -44,10 +44,10 @@ class YOLOModelExporter(ModelExporter):
     
     def generate_input_metadata(self, model_path: str) -> list[dict]:
         inputs_info: list[dict] = super().generate_input_metadata(model_path)
-        return [
-            {"scale": 255, "format": "rgb keep_proportions=1", **info}
-            for info in inputs_info
-        ]
+        for input_info in inputs_info:
+            input_info["format"] = "rgb keep_proportions=1"
+            input_info["scale"] = 255
+        return inputs_info
     
     def generate_output_metadata(self, model_path: str) -> list[dict] | None:
         outputs_info: list[dict] = super().generate_output_metadata(model_path)
