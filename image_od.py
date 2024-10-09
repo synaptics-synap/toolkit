@@ -22,29 +22,7 @@ import random
 import os.path
 import numpy as np
 
-def get_colors_from_json(colors_json: str, verbose: bool):
-
-    def is_valid_color(color):
-        return (
-            isinstance(color, list) and 
-            len(color) == 3 and 
-            all(isinstance(c, int) and 0 <= c <= 255 for c in color)
-        )
-
-    try:
-        with open(colors_json, "r") as f:
-            mask_colors = json.load(f)
-            mask_colors = {int(k): v for k, v in mask_colors.items()}
-            if not(all(is_valid_color(color) for color in mask_colors.values())):
-                raise ValueError(f"Erroneous color values in \"{colors_json}\"")
-            return mask_colors
-    except ValueError as e:
-        if verbose:
-            print(f"ERROR: Couldn't parse mask colors: {e.args[0]}")
-    except (FileNotFoundError, json.JSONDecodeError):
-        if verbose:
-            print(f"ERROR: Invalid mask colors file \"{colors_json}\"")
-    return None
+from pysynap.utils.utils import get_colors_from_json, COLORS_COCO
 
 def get_rand_color():
     return [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
@@ -95,10 +73,14 @@ def image_od(src, dst, json_od_result:str, mask_colors: dict, verbose: bool):
                 mask_h, mask_w = detection['mask']['height'], detection['mask']['width']
                 mask = np.array(detection['mask']['data'], dtype=np.float32)
                 if prev_mask is not None and np.array_equal(prev_mask, mask):
-                    print("Current mask same as previous mask")
+                    if verbose:
+                        print("Current mask same as previous mask")
                 prev_mask = mask
                 mask = scale_mask(mask, mask_w, mask_h, inp_w, inp_h)
                 mask_color = mask_colors.get(ci, None) if mask_colors else None
+                if mask_color is None:
+                    if verbose:
+                        print(f"WARNING: Using random color for detection {i} as no color defined for class {ci}")
                 add_mask(mask, combined_mask, (x1, y1, dx, dy), color=mask_color)
                 # individually overlay mask on image and save a copy
                 # cv2.imwrite(f'mask_{i} (class {ci}).jpg', overlay_mask(mask, cv2.imread(src), (x1, y1, dx, dy), color=mask_color))
