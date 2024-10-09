@@ -123,7 +123,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--src', help='Source image (.png or .jpg)')
     parser.add_argument('-o', '--dst', help='Destination image file')
-    parser.add_argument('--mask_colors', help='JSON file containing segmentation mask colors')
+    parser.add_argument('--mask_colors', help='JSON file containing segmentation mask colors in {"class_index": [B,G,R], ...} format')
     parser.add_argument('--verbose', action="store_true", default=False, help="Enable verbose logging")
     args = parser.parse_args()
     od_result = sys.stdin.read()
@@ -138,7 +138,10 @@ def main():
         sys.exit(1)
     od_result = od_result[json_begin:]
 
-    mask_colors = get_colors_from_json(args.mask_colors or "utils/colors_coco.json", args.verbose)
+    if args.mask_colors:
+        mask_colors = get_colors_from_json(args.mask_colors, args.verbose)
+    else:
+        mask_colors = COLORS_COCO
 
     image_od(args.src, args.dst, od_result, mask_colors, args.verbose)
 
