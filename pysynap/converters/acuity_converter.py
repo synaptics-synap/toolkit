@@ -188,8 +188,6 @@ class Converter:
                 if os.path.isfile('entropy.txt'):
                     shutil.copyfile('entropy.txt', os.path.join(self._base_work_dir, "quantization_entropy.txt"))
 
-            self._vsi_nn.generate_inputmeta(net)
-
             il = net.get_input_layers(ign_variable=True)
             if len(meta.inputs) > len(il):
                 raise ConversionError(f"Model has {len(il)} inputs but {len(meta.inputs)} inputs specified in meta file")
@@ -200,6 +198,9 @@ class Converter:
             if logger.getEffectiveLevel() <= logging.INFO:
                 logger.info("Input layers:" +
                              ", ".join([input.name + ":" + str(input.compute_shape_nhwc()[0].dims) for input in il]))
+
+            # As of Acuity 6.30.6, a separate dataset file is required for each input
+            self._vsi_nn.generate_inputmeta(net, separated_database=True, dataset_file=['dataset.txt']*len(il), dataset_type=['TEXT']*len(il))
             self._add_preprocessing(net, meta)
 
             return net
@@ -582,10 +583,10 @@ class Converter:
             return in_layers
         if meta.input_names_str(False):
             try:
-                in_layers = [next(l for l in in_layers if l.name == lyr.name) for lyr in meta.inputs]
+                in_layers = [next(l for l in in_layers if l.original_name ==  lyr.name) for lyr in meta.inputs]
             except:
                 raise ConversionError(
-                    f"No matching input layers for {[lyr.name for lyr in meta.inputs]} in {[l.name for l in in_layers]}")
+                    f"No matching input layers for {[lyr.name for lyr in meta.inputs]} in {[l.original_name for l in in_layers]}")
         return in_layers
 
     @staticmethod
@@ -703,10 +704,10 @@ class Converter:
             selected_outputs = []
             for lyr in meta.outputs:
                 try:
-                    selected_outputs.append(next(l for l in out_layers if l.name == lyr.name))
+                    selected_outputs.append(next(l for l in out_layers if l.original_name == lyr.name))
                 except:
                     raise ConversionError(f"Specified output: {lyr.name} not in model outputs: "
-                                          f"{[l.name for l in net.get_output_layers()]}")
+                                          f"{[l.original_name for l in net.get_output_layers()]}")
             out_layers = selected_outputs
         for out_index, l in enumerate(out_layers):
             if meta.dequantize_outputs or out_index < len(meta.outputs) and meta.outputs[out_index].dequantize:

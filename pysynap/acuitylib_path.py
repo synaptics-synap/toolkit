@@ -9,7 +9,7 @@ current_path = pathlib.Path(__file__)
 toolkit_dir = current_path.parent.parent.absolute()
 internal_tree = False
 # check if pysynap is run from the source tree
-vsi_acuity_dir = f"{toolkit_dir}/../../acuity"
+vsi_acuity_dir = f"{toolkit_dir}/../acuity"
 if os.path.exists(f"{vsi_acuity_dir}/acuitylib/__init__.py"):
     internal_tree = True
 #check if prebuilts tree is available in current directory
