@@ -23,7 +23,8 @@ from pysynap.meta import load_metafile, MetaInfo, NetworkFormat
 
 # Disable init-time info messages from Tensorflow
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
+# Used in Acuity for creating ruler files
+os.environ['SYNAP_VERSION'] = pysynap.version
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] in ['--version', '-v']:
