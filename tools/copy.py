@@ -5,7 +5,7 @@ from os import getcwd
 from pathlib import Path
 from sys import exit
 
-from model.utils.temp_script import TempScript
+from tools.utils.temp_script import TempScript
 
 
 def copy_models_to_board(
@@ -62,7 +62,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=f"python -m model.copy", description=__doc__
+        prog=f"python -m tools.copy", description=__doc__
     )
     group = parser.add_argument_group(
         "model selection",

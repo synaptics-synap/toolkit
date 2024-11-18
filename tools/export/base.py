@@ -10,7 +10,7 @@ from time import sleep
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
-from model.utils.model_info import *
+from tools.utils.model_info import *
 
 __all__ = [
     "ModelExportInfo",

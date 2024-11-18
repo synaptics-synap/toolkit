@@ -2,13 +2,13 @@
 
 | Implementation |
 |----------------|
-| [model/profile.py](/model/profile.py) |
+| [tools/profile.py](/tools/profile.py) |
 
 This is a guide on profiling SyNAP models on a Astra board via SSH. ADB support is planned for the future.
 The profiling results are from running `synap_cli` with `random` input and 10 inferences.
 
 ## Profile options
-To profile models, run `python -m model.profile`. The following options are available:
+To profile models, run `python -m tools.profile`. The following options are available:
 - `--serial`: The device serial for ADB. By default ADB will use the first connected device it finds, use this to specify a different device.
 - `--board_ip`: The IP address of the board to profile models on. If provided, profiling will be done over SSH instead of ADB.
 - `--models_dir`: Directory containing the models to profile. Default is `/home/root/models`.
@@ -16,26 +16,26 @@ To profile models, run `python -m model.profile`. The following options are avai
   - `--all`: Profile all models.
   - `--models NAME [NAME, ...]`: Profile all models corresponding to `NAME`s, which can be model filenames or a singular glob pattern.
 
-A summarized version of this information is available via `python -m model.convert --help`.
+A summarized version of this information is available via `python -m tools.convert --help`.
 
 > [!NOTE]
-> This tool is intended to be used in conjunction with [`model.convert`](/model/docs/copy.md). As such, model selection via `--models` is somewhat dependent on the format of the converted model filenames produced by the convert script.
+> This tool is intended to be used in conjunction with [`tools.convert`](/tools/docs/copy.md). As such, model selection via `--models` is somewhat dependent on the format of the converted model filenames produced by the convert script.
 
 ## Profile examples
 1. Profile all models:
 ```sh
-python -m model.profile \
+python -m tools.profile \
     --all
 ```
 2. Profile only models with 224x224 input size, over SSH:
 ```sh
-python -m model.profile \
+python -m tools.profile \
     --models *224x224* \
     --board_ip <IP address>
 ```
 3. Profile models from a different directory:
 ```sh
-python -m model.profile \
+python -m tools.profile \
     --all \
     --models_dir /tmp
 ```

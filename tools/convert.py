@@ -7,7 +7,7 @@ from pathlib import Path
 from sys import exit
 from time import sleep
 
-from model.utils.temp_script import TempScript
+from tools.utils.temp_script import TempScript
 
 
 def convert_model(
@@ -92,7 +92,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=f"python -m model.convert", description=__doc__
+        prog=f"python -m tools.convert", description=__doc__
     )
     group = parser.add_argument_group(
         "model selection",

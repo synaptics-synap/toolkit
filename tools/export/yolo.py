@@ -11,8 +11,8 @@ from typing import Any
 from ultralytics import YOLO
 from ultralytics.utils import LOGGER
 
-from model.export.base import ModelExporter, ModelExportInfo, export_and_save_models
-from model.utils.model_info import *
+from tools.export.base import ModelExporter, ModelExportInfo, export_and_save_models
+from tools.utils.model_info import *
 
 # suppress Ultralytics logging
 LOGGER.setLevel(ERROR)
@@ -128,8 +128,8 @@ if __name__ == "__main__":
         "--input_sizes",
         nargs="+",
         default=["640x352"],
-        metavar="SIZE",
-        help="Input image sizes. Each dimension must be a multiple of 32 (wxh) (default: %(default)s)",
+        metavar="WIDTHxHEIGHT",
+        help="Input image sizes. Each dimension must be a multiple of 32 (default: %(default)s)",
     )
     parser.add_argument(
         "--export_formats",
@@ -137,7 +137,7 @@ if __name__ == "__main__":
         default=["tflite"],
         metavar="FMT",
         choices=["tflite", "onnx", "pb", "pt"],
-        help="Export model formats (default: %(default)s)",
+        help="Export model formats, select from [%(choices)s] (default: %(default)s)",
     )
     quant_grp = parser.add_argument_group("optional quantization parameters")
     quant_grp.add_argument(
@@ -145,7 +145,7 @@ if __name__ == "__main__":
         nargs="+",
         metavar="TYPE",
         choices=["uint8", "int8", "int16", "float16", "mixed"],
-        help="Quantization types to apply",
+        help="Quantization types to apply, select from [%(choices)s]",
     )
     quant_grp.add_argument(
         "--quant_datasets",

@@ -2,12 +2,12 @@
 
 import argparse
 
-from model.utils.temp_script import TempScript
+from tools.utils.temp_script import TempScript
 
 def profile_models_ssh(
     model_names: list[str], models_dir: str, board_ip: str | None, profile_all: bool
 ) -> None:
-    cp_bench_cmd = f"scp model/scripts/benchmark.sh root@{board_ip}:{models_dir}/benchmark.sh"
+    cp_bench_cmd = f"scp tools/scripts/benchmark.sh root@{board_ip}:{models_dir}/benchmark.sh"
     profile_cmd = f"ssh -T root@{board_ip} << EOF\n"
     profile_cmd += f"cd {models_dir}\nchmod u+x benchmark.sh\n"
     if profile_all:
@@ -25,7 +25,7 @@ def profile_models_adb(
     model_names: list[str], models_dir: str, serial: str, profile_all: bool
 ) -> None:
     adb = f"adb -s {serial}" if serial else "adb"
-    cp_bench_cmd = f"{adb} push model/scripts/benchmark.sh {models_dir}/benchmark.sh > /dev/null"
+    cp_bench_cmd = f"{adb} push tools/scripts/benchmark.sh {models_dir}/benchmark.sh > /dev/null"
     chmod_cmd = f"{adb} shell chmod u+x {models_dir}/benchmark.sh"
     if profile_all:
         profile_cmd = f"{adb} shell {models_dir}/benchmark.sh {models_dir}"
@@ -41,7 +41,7 @@ def profile_models_adb(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=f"python -m model.profile", description=__doc__
+        prog=f"python -m tools.profile", description=__doc__
     )
     group = parser.add_argument_group(
         "model selection",
