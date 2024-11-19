@@ -44,24 +44,13 @@ def get_model_export_files(export_dir: str, export_formats: list[str]) -> list[P
 
 
 def main() -> None:
-    to_delete: list[Path] = []
-    if args.cache:
-        to_delete += get_files_and_dirs(f"{os.getcwd()}/.export_cache")
-    if args.converted:
-        to_delete += get_files_and_dirs(args.convert_dir)
-    if args.exported:
-        to_delete += get_model_export_files(args.export_dir, args.export_formats)
-    cleanup(to_delete, args.yes)
-
-
-if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=f"python -m src.{Path(__file__).stem}", description=__doc__
+        prog=f"python -m pysynap.tools.utils.cleanup", description=__doc__
     )
     parser.add_argument(
         "--export_formats",
         nargs="+",
-        default=["tflite", "onnx"],
+        default=["tflite", "onnx", "pb", "pt"],
         metavar="FMT",
         help="Export model formats (default: %(default)s)",
     )
@@ -112,4 +101,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.all:
         args.exported, args.converted = True, True
+
+    to_delete: list[Path] = []
+    if args.cache:
+        to_delete += get_files_and_dirs(f"{os.getcwd()}/.export_cache")
+    if args.converted:
+        to_delete += get_files_and_dirs(args.convert_dir)
+    if args.exported:
+        to_delete += get_model_export_files(args.export_dir, args.export_formats)
+    cleanup(to_delete, args.yes)
+
+
+if __name__ == "__main__":
     main()

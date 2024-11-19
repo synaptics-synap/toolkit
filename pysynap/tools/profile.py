@@ -1,13 +1,22 @@
 """Profile converted models on a development board with synap_cli"""
 
 import argparse
+import importlib.resources
 
-from tools.utils.temp_script import TempScript
+from .utils.temp_script import TempScript
+
+
+def _get_benchmark_script() -> str:
+    with importlib.resources.path("pysynap.utils", "benchmark.sh") as script_path:
+        return str(script_path)
 
 def profile_models_ssh(
     model_names: list[str], models_dir: str, board_ip: str | None, profile_all: bool
 ) -> None:
-    cp_bench_cmd = f"scp tools/scripts/benchmark.sh root@{board_ip}:{models_dir}/benchmark.sh"
+    if not models_dir.startswith("/"):
+        models_dir = "/" + models_dir
+    bench_script = _get_benchmark_script()
+    cp_bench_cmd = f"scp {bench_script} root@{board_ip}:{models_dir}/benchmark.sh"
     profile_cmd = f"ssh -T root@{board_ip} << EOF\n"
     profile_cmd += f"cd {models_dir}\nchmod u+x benchmark.sh\n"
     if profile_all:
@@ -24,8 +33,11 @@ def profile_models_ssh(
 def profile_models_adb(
     model_names: list[str], models_dir: str, serial: str, profile_all: bool
 ) -> None:
+    if not models_dir.startswith("/"):
+        models_dir = "/" + models_dir
+    bench_script = _get_benchmark_script()
     adb = f"adb -s {serial}" if serial else "adb"
-    cp_bench_cmd = f"{adb} push tools/scripts/benchmark.sh {models_dir}/benchmark.sh > /dev/null"
+    cp_bench_cmd = f"{adb} push {bench_script} {models_dir}/benchmark.sh > /dev/null"
     chmod_cmd = f"{adb} shell chmod u+x {models_dir}/benchmark.sh"
     if profile_all:
         profile_cmd = f"{adb} shell {models_dir}/benchmark.sh {models_dir}"
@@ -39,9 +51,9 @@ def profile_models_adb(
     se.run(success_msg=None, error_msg="Profiling failed")
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(
-        prog=f"python -m tools.profile", description=__doc__
+        prog=f"python -m pysynap.tools.profile", description=__doc__
     )
     group = parser.add_argument_group(
         "model selection",
@@ -82,3 +94,7 @@ if __name__ == "__main__":
         profile_models_ssh(args.models, args.models_dir, args.board_ip, args.all)
     else:
         profile_models_adb(args.models, args.models_dir, args.serial, args.all)
+
+
+if __name__ == "__main__":
+    main()
