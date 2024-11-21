@@ -6,7 +6,10 @@ on:
       tag_name:
         description: 'Tag of the draft release to upload to'
         required: true
-
+      toolkit_prebuilt_branch:
+        description: 'Branch to checkout for toolkit-prebuilts'
+        required: false
+        default: 'main'
 permissions:
   packages: write
   contents: write
@@ -34,7 +37,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: synaptics-synap/toolkit-prebuilts
-        ref: main
+        ref: ${{ github.event.inputs.toolkit_prebuilt_branch }}
         path: pysynap/prebuilts
         lfs: true
 
