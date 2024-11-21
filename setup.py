@@ -45,6 +45,7 @@ shutil.copyfile('synap_convert.py', 'pysynap/scripts/synap_convert.py')
 shutil.copyfile('image_from_raw.py', 'pysynap/scripts/image_from_raw.py')
 shutil.copyfile('image_to_raw.py', 'pysynap/scripts/image_to_raw.py')
 shutil.copyfile('image_od.py', 'pysynap/scripts/image_od.py')
+shutil.copyfile('export_yolo.py', 'pysynap/scripts/export_yolo.py')
 
 setup(
     name='synap',
@@ -59,7 +60,7 @@ setup(
         'pysynap': 'pysynap'
     },
     package_data={
-        'pysynap': ['*'],
+        'pysynap': ['*', 'utils/*.sh'],
     },
     include_package_data=True,
     ext_modules=extensions,
@@ -70,6 +71,10 @@ setup(
             'synap_image_from_raw=pysynap.scripts.image_from_raw:main',
             'synap_image_to_raw=pysynap.scripts.image_to_raw:main',
             'synap_image_od=pysynap.scripts.image_od:main',
+            'synap_export_yolo=pysynap.scripts.export_yolo:main',
+            'synap_export_clean=pysynap.tools.utils.cleanup:main',
+            'synap_copy=pysynap.tools.copy:main',
+            'synap_profile=pysynap.tools.profile:main',
             'synap=pysynap.scripts.synap_help:main',
         ],
     },

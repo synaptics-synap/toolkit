@@ -1,16 +1,15 @@
 import os
 from abc import ABC, abstractmethod
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import copy2, copytree
 from tempfile import TemporaryDirectory
-from time import sleep
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
-from model.utils.model_info import *
+from ..utils.model_info import *
 
 __all__ = [
     "ModelExportInfo",
@@ -76,6 +75,7 @@ class ModelExporter(ABC):
         return commented_metadata
 
     def generate_input_metadata(self, model_path: str) -> list[dict] | None:
+        model_path = str(model_path)
         if self.model_info.export_format == "onnx":
             return get_onnx_layer_info(model_path, "input")
         elif self.model_info.export_format == "tflite":
@@ -87,6 +87,7 @@ class ModelExporter(ABC):
             return None
     
     def generate_output_metadata(self, model_path: str) -> list[dict] | None:
+        model_path = str(model_path)
         if self.model_info.export_format == "onnx":
             return get_onnx_layer_info(model_path, "output")
         elif self.model_info.export_format == "tflite":
@@ -97,10 +98,10 @@ class ModelExporter(ABC):
             )
             return None
     
-    def generate_quant_metadata(self, quant_type: str | None, quant_datasets: list[str] | None) -> dict[str, str]:
+    def generate_quant_metadata(self, quant_type: str | None, quant_dataset: str | None) -> dict[str, str]:
         quant_info: dict[str, str] = {}
         if quant_type and quant_type != "float16":
-            if not quant_datasets:
+            if not quant_dataset:
                 raise ValueError(f"Quantization dataset not provided for quantization type {quant_type}")
             if quant_type in ("uint8", "int8", "int16"):
                 quant_info["data_type"] = quant_type
@@ -111,16 +112,16 @@ class ModelExporter(ABC):
                 )
             elif quant_type == "mixed":
                 quant_info.update({"data_type": {'"*"': "uint8"}})
-            quant_info["dataset"] = quant_datasets
+            quant_info["dataset"] = quant_dataset
         return quant_info
     
     def generate_metadata(
-        self, model_path: str, quant_type: str | None = None, quant_datasets: list[str] | None = None
+        self, model_path: str, quant_type: str | None = None, quant_dataset: str | None = None
     ) -> dict[str, list | dict | None]:
         metadata: dict[str, list | dict | None] = {}
         metadata["inputs"] = self.generate_input_metadata(model_path)
         metadata["outputs"] = self.generate_output_metadata(model_path)
-        metadata["quantization"] = self.generate_quant_metadata(quant_type, quant_datasets)
+        metadata["quantization"] = self.generate_quant_metadata(quant_type, quant_dataset)
         return metadata
     
     def save_exported_model(
@@ -129,31 +130,39 @@ class ModelExporter(ABC):
         export_dir: str,
         metadata: dict[str, list | dict] | None,
         quant_type: str | None,
-    ) -> None:
+    ) -> dict[str, Path | None]:
         
         def tr_yaml(yaml: str) -> str:
             return yaml.replace("'", "").replace('"', "'")
 
+        saved_files: dict[str, Path | None] = {"model": None, "yaml": None}
         export_dir: Path = Path(export_dir)
         if not export_dir.exists():
             export_dir.mkdir(exist_ok=True, parents=True)
         model_path: Path = Path(model_path)
-        export_path: str = f"{export_dir}/{self.model_info.export_filename(quant_type)}"
-        copy2(model_path, export_path)
+        exported_model_path: Path = export_dir / self.model_info.export_filename(quant_type)
+        copy2(model_path, exported_model_path)
+        if exported_model_path.exists():
+            saved_files["model"] = exported_model_path
         # print(f'Exported model "{model_path}" copied to "{export_path}"')
         if metadata:
             commented_metadata = self.check_metadata(metadata)
             if commented_metadata.get("quantization") and quant_type == "mixed":
                 metadata["quantization"] = CommentedMap(commented_metadata["quantization"])
                 metadata["quantization"].yaml_set_comment_before_after_key("data_type", after="add mixed quantzation layers here")
+            exported_yaml_path: Path = export_dir / self.model_info.yaml_filename(quant_type)
             with open(
-                f"{export_dir}/{self.model_info.yaml_filename(quant_type)}", "w"
+                exported_yaml_path, "w"
             ) as f:
                 yaml = YAML()
                 yaml.default_flow_style = False
                 yaml.dump(commented_metadata, f, transform=tr_yaml)
+            if exported_yaml_path.exists():
+                saved_files["yaml"] = exported_yaml_path
         else:
             print(f"Metadata file not generated for {self.model_info}, please create manually")
+
+        return saved_files
 
     def cleanup_export_files(self) -> None:
         pass
@@ -164,8 +173,9 @@ def __run_exporter(
     export_dir: str,
     quant_types: list[str],
     quant_dataset: str | None = None,
-):
+) -> list[Path]:
     model_info: ModelExportInfo = exporter.model_info
+    exported_paths: list[Path] = []
     curr_wd = os.getcwd()
     with TemporaryDirectory() as temp_dir:
         os.chdir(temp_dir)
@@ -178,17 +188,21 @@ def __run_exporter(
             metadata: dict[str, list | dict] | None = exporter.generate_metadata(
                 model_path, quant_type, quant_dataset
             )
+            export_filename: str = model_info.export_filename(quant_type)
             if metadata:
                 print(
-                    f"Generating metadata for {model_info.export_filename(quant_type)} ... complete"
+                    f"Generating metadata for {export_filename} ... complete"
                 )
-            exporter.save_exported_model(model_path, export_dir, metadata, quant_type)
+            saved_files = exporter.save_exported_model(model_path, export_dir, metadata, quant_type)
             print(
-                f"Saving model and metadata for {model_info.export_filename(quant_type)} ... complete"
+                f"Saving model and metadata for {export_filename} ... complete"
             )
+            if (model_path := saved_files.get("model")) and saved_files.get("yaml"):
+                exported_paths.append(model_path)
         exporter.cleanup_export_files()
         __update_cache(model_info.model_id, temp_dir)
     os.chdir(curr_wd)
+    return exported_paths
 
 
 def __fetch_from_cache(model_id: str, model_files_dir: str) -> None:
@@ -209,10 +223,10 @@ def __update_cache(model_id: str, model_files_dir: str) -> None:
 def export_and_save_models(
     exporters: list[ModelExporter],
     quant_types: list[str] | None,
-    quant_datasets: list[str] | None,
+    quant_dataset: str | None,
     export_dir: str,
     no_parallel: bool,
-) -> None:
+) -> list[Path]:
     if quant_types is None:
         quant_types = [None]
     model_export_names: list[str] = [
@@ -229,18 +243,37 @@ def export_and_save_models(
     print(f"Export dir         : {export_dir}")
     print(f"Concurrent exports : {'No' if no_parallel else str(max_workers)}")
     print("===========================================================\n")
+
+    exported_paths: list[Path] = []
     if input("Continue? ([y]/n): ") not in ("n", "N"):
         if no_parallel:
             for exporter in exporters:
-                __run_exporter(exporter, export_dir, quant_types, quant_datasets)
+                exported_paths.extend(
+                    __run_exporter(
+                        exporter,
+                        export_dir,
+                        quant_types,
+                        quant_dataset
+                    )
+                )
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                for exporter in exporters:
+                futures = [
                     executor.submit(
                         __run_exporter,
                         exporter,
                         export_dir,
                         quant_types,
-                        quant_datasets,
+                        quant_dataset,
                     )
-                    sleep(0.5)
+                    for exporter in exporters
+                ]
+                for future in as_completed(futures):
+                    try:
+                        exported_paths.extend(future.result())
+                    except KeyboardInterrupt as e:
+                        raise KeyboardInterrupt from e
+                    except Exception as e:
+                        print(f"Error: Model export failed: {e}")
+
+    return exported_paths

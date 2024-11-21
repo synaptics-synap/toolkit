@@ -3,6 +3,8 @@ import subprocess
 import stat
 from pathlib import Path
 
+from . import print_err
+
 __all__ = [
     "TempScript",
 ]
@@ -37,14 +39,14 @@ class TempScript:
             )
         except subprocess.CalledProcessError as e:
             if error_msg:
-                print(f"{error_msg} with return code: {e.returncode}")
-            if e.stderr:
-                print(e.stderr.decode())
+                err_msg = f"{error_msg} with return code {e.returncode}"
+                err_det = e.stderr.decode().strip().replace("\n", "\n\t") if e.stderr else None
+                print_err(err_msg, err_det)
         else:
             if success_msg:
                 print(success_msg)
             if res.stdout:
-                print(res.stdout.decode())
+                print(res.stdout.decode().strip())
         finally:
             try:
                 Path(temp_script_name).unlink()

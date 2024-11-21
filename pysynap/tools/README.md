@@ -4,21 +4,21 @@ The following models are currently supported:
 
 | Model | Export Script |
 |-------|---------------|
-| [YOLOv8](https://docs.ultralytics.com/models/yolov8/) | [export/yolo.py](/model/export/yolo.py) |
-| [YOLOv9](https://docs.ultralytics.com/models/yolov9/) | [export/yolo.py](/model/export/yolo.py) |
+| [YOLOv8](https://docs.ultralytics.com/models/yolov8/) | [export/yolo.py](export/yolo.py) |
+| [YOLOv9](https://docs.ultralytics.com/models/yolov9/) | [export/yolo.py](export/yolo.py) |
 
 ## YOLO Export Quickstart
 This tutorial will go through exporting the YOLOv8 segmentation (small) model into two input sizes (640x352, 224x224) and two quantization types (uint8, float16). The quantization dataset used is [`coco8-seg`](https://docs.ultralytics.com/datasets/segment/coco8-seg/) and is assumed to be located at `"/home/$USER/synaptics-synap/toolkit/datasets/coco8-seg/*.jpg"`. The board used is the Astra SL1680 with firmware v1.1.0.
 
 ### 1. Export YOLOv8 to TFLite models
 ```sh
-python -m model.export.yolo \
+python -m pysynap.tools.export.yolo \
     --models yolov8s-seg \
     --input_sizes 640x352 224x224 \
     --quant_types uint8 float16 \
     --quant_datasets "/home/$USER/synaptics-synap/toolkit/datasets/coco8-seg/*.jpg"
 ```
-*See the [documentation on model export](/model/docs/export.md) for more details on* `model.export.yolo`
+*See the [documentation on model export](docs/export.md) for more details on* `tools.export.yolo`
 
 The above command will generate 4 TFLite models and their corresponding YAML conversion metafiles to the export directory, which by default is `models/exported`.
 ```
@@ -36,11 +36,11 @@ Now would be a good time to modify the conversion metafiles if needed. We'll be 
 
 ### 2. Converting TFLite models to SyNAP
 ```sh
-python -m model.convert \
+python -m pysynap.tools.convert \
     --all \
     --target SL1680
 ```
-*See the [documentation on model conversion](/model/docs/convert.md) for more details on* `model.convert`
+*See the [documentation on model conversion](docs/convert.md) for more details on* `tools.convert`
 
 The above command will convert all of the models from `models/exported` to the SyNAP format and store them in the converted models directory, which by default is `models/converted`.
 ```
@@ -65,29 +65,29 @@ This step is identical to running `synap convert` manually on every model in `mo
 
 ### 3. Copying SyNAP models to board
 ```sh
-python -m model.copy --all
+python -m pysynap.tools.copy --all
 ```
 Or via SSH:
 ```sh
-python -m model.copy \
+python -m pysynap.tools.copy \
     --all \
     --board_ip <IP address>
 ```
-*See the [documentation on copying models](/model/docs/copy.md) for more details on* `model.copy`
+*See the [documentation on copying models](docs/copy.md) for more details on* `tools.copy`
 
 The above command will copy all SyNAP models from `models/converted` to the board at `root@<IP address>:/home/root/models` using SSH. The destination directory will be created if it doesn't exist.
 
 ### 4. [Optional] Profile copied models with `synap_cli`
 ```sh
-python -m model.copy --all
+python -m pysynap.tools.copy --all
 ```
 Or via SSH:
 ```sh
-python -m model.profile \
+python -m pysynap.tools.profile \
     --all \
     --board_ip <IP address>
 ```
-*See the [documentation on profiling models](/model/docs/profile.md) for more details on* `model.profile`
+*See the [documentation on profiling models](docs/profile.md) for more details on* `tools.profile`
 
 The above command will profile all models with `synap_cli` from `root@<IP address>:/home/root/models` over SSH. The results will be displayed on the console:
 ```

@@ -7,7 +7,7 @@ from pathlib import Path
 from sys import exit
 from time import sleep
 
-from model.utils.temp_script import TempScript
+from .utils.temp_script import TempScript
 
 
 def convert_model(
@@ -53,46 +53,8 @@ def convert_multiple(
 
 
 def main() -> None:
-    export_dir: Path = Path(args.export_dir)
-    convert_dir: Path = Path(args.convert_dir)
-    model_paths: list[Path] = []
-    args.models = list(set(args.models) if args.models else set())
-    if args.models:
-        if len(args.models) == 1:
-            model_paths.extend(
-                [
-                    p
-                    for p in list(Path(export_dir).glob(args.models[0]))
-                    if p.suffix.lstrip(".") in args.export_formats
-                ]
-            )
-        else:
-            model_paths.extend([Path(export_dir) / model for model in args.models])
-        if not model_paths:
-            print(f"No models to convert in {export_dir.resolve()}")
-            exit()
-        convert_multiple(
-            model_paths, convert_dir, args.target, args.profiling, args.no_parallel
-        )
-        return
-    else:
-        for fmt in args.export_formats:
-            model_paths.extend(list(export_dir.glob(f"*.{fmt}")))
-    if not model_paths:
-        print(f"No models to convert in {export_dir.resolve()}")
-        exit()
-    if args.latest:
-        latest_model: Path = max(model_paths, key=lambda p: p.stat().st_mtime)
-        convert_model(latest_model, convert_dir, args.target, args.profiling)
-    else:
-        convert_multiple(
-            model_paths, convert_dir, args.target, args.profiling, args.no_parallel
-        )
-
-
-if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=f"python -m model.convert", description=__doc__
+        prog=f"python -m pysynap.tools.convert", description=__doc__
     )
     group = parser.add_argument_group(
         "model selection",
@@ -157,4 +119,43 @@ if __name__ == "__main__":
         help="Do not convert multiple models in parallel. Useful for resource constrained systems",
     )
     args = parser.parse_args()
+
+    export_dir: Path = Path(args.export_dir)
+    convert_dir: Path = Path(args.convert_dir)
+    model_paths: list[Path] = []
+    args.models = list(set(args.models) if args.models else set())
+    if args.models:
+        if len(args.models) == 1:
+            model_paths.extend(
+                [
+                    p
+                    for p in list(Path(export_dir).glob(args.models[0]))
+                    if p.suffix.lstrip(".") in args.export_formats
+                ]
+            )
+        else:
+            model_paths.extend([Path(export_dir) / model for model in args.models])
+        if not model_paths:
+            print(f"No models to convert in {export_dir.resolve()}")
+            exit()
+        convert_multiple(
+            model_paths, convert_dir, args.target, args.profiling, args.no_parallel
+        )
+        return
+    else:
+        for fmt in args.export_formats:
+            model_paths.extend(list(export_dir.glob(f"*.{fmt}")))
+    if not model_paths:
+        print(f"No models to convert in {export_dir.resolve()}")
+        exit()
+    if args.latest:
+        latest_model: Path = max(model_paths, key=lambda p: p.stat().st_mtime)
+        convert_model(latest_model, convert_dir, args.target, args.profiling)
+    else:
+        convert_multiple(
+            model_paths, convert_dir, args.target, args.profiling, args.no_parallel
+        )
+
+
+if __name__ == "__main__":
     main()

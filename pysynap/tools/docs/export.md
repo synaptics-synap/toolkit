@@ -2,11 +2,11 @@
 
 | Implemenation |
 |---------------|
-| [export/base.py](/model/export/base.py) |
-| [export/yolo.py](/model/export/yolo.py) |
+| [export/base.py](../export/base.py) |
+| [export/yolo.py](../export/yolo.py) |
 
 This is a guide on exporting models to various SyNAP compatible formats.
-The base model export file is located at [base.py](/model/export/base.py) and contains classes and functions for creating custom model export scripts and conversion metafile generation.
+The base model export file is located at [base.py](../export/base.py) and contains classes and functions for creating custom model export scripts and conversion metafile generation.
 
 > [!NOTE]
 > Conversion metafile generation is currently only supported for TFLite (`.tflite`) and ONNX (`.onnx`) models.
@@ -14,10 +14,10 @@ The base model export file is located at [base.py](/model/export/base.py) and co
 ## Exporting YOLO models
 | Model | Export Script |
 |-------|---------------|
-| [YOLOv8](https://docs.ultralytics.com/models/yolov8/) | [export/yolo.py](/model/export/yolo.py) |
-| [YOLOv9](https://docs.ultralytics.com/models/yolov9/) | [export/yolo.py](/model/export/yolo.py) |
+| [YOLOv8](https://docs.ultralytics.com/models/yolov8/) | [export/yolo.py](../export/yolo.py) |
+| [YOLOv9](https://docs.ultralytics.com/models/yolov9/) | [export/yolo.py](../export/yolo.py) |
 
-The `export/yolo.py` script can be used to export YOLOv8 and YOLOv9 models to TFLite (`.tflite`), ONNX (`.onnx`), PyTorch (`.pt`) and Tensorflow (`.pb`) formats. The script can be run with `python -m model.export.yolo` and has the following options:
+The `export/yolo.py` script can be used to export YOLOv8 and YOLOv9 models to TFLite (`.tflite`), ONNX (`.onnx`), PyTorch (`.pt`) and Tensorflow (`.pb`) formats. The script can be run with `python -m pysynap.tools.export.yolo` and has the following options:
 - `--models`*: The YOLO model(s) to export. Can be a YOLO model name (e.g. "yolov8s-seg") or a saved model weights (`.pt`) file.
 - `--export_dir`: The directory to save exported models and their converstion metafiles in. The default is `"models/exported"`.
 - `--input_sizes`*: Model input size(s) to export in, specified as `widthxheight`. Both width and height must be multiples of 32. The default is `640x352`.
@@ -34,31 +34,31 @@ The `export/yolo.py` script can be used to export YOLOv8 and YOLOv9 models to TF
 > [!TIP]
 > The script will do a cartesian product to compute all possible combinations for options marked with a *, and export a model for each combination.
 
-Summarzied info on the input options is available via `python -m model.export.yolo --help`.
+Summarzied info on the input options is available via `python -m pysynap.tools.export.yolo --help`.
 
 ### YOLO export examples
 1. Exporting YOLOv9 (compact) to multiple export formats (2 exported models):
 ```
-python -m model.export.yolo \
+python -m pysynap.tools.export.yolo \
     --models yolov9c \
     --export_formats onnx tflite
 ```
 2. Exporting YOLOv8 segmentation (nano) to multiple input sizes (2 exported models):
 ```
-python -m model.export.yolo \
+python -m pysynap.tools.export.yolo \
     --models yolov8n-seg \
     --input_sizes 640x352 224x224
 ```
 3. Exporting a model from saved weights to multiple quantization schemes (2 exported models):
 ```
-python -m model.export.yolo \
+python -m pysynap.tools.export.yolo \
     --models "my_fine_tuned_model.pt" \
     --quant_types uint8 float16 \
     --quant_datasets "datasets/coco8-seg/*.jpg"
 ```
 4. Exporting multiple YOLO models to multiple export formats, input sizes, and quantization schemes (24 exported models):
 ```
-python -m model.export.yolo \
+python -m pysynap.tools.export.yolo \
     --models yolov8m yolov8s-seg yolov8n-pose \
     --input_sizes 640x352 224x224 \
     --export_formats onnx tflite \
@@ -67,6 +67,6 @@ python -m model.export.yolo \
 ```
 
 ## Creating Exporters
-The `ModelExporter` class from [export/base.py](/model/export/base.py) can be extended to create custom exporters for different models.
+The `ModelExporter` class from [export/base.py](../export/base.py) can be extended to create custom exporters for different models.
 
 [WIP]

@@ -1,29 +1,36 @@
 """Copy converted models to development board"""
 
 import argparse
-from os import getcwd
+import os
+import sys
 from pathlib import Path
-from sys import exit
 
-from model.utils.temp_script import TempScript
+from .utils.board_utils import check_cnxn_adb, check_cnxn_ssh
+from .utils.temp_script import TempScript
 
 
 def copy_models_to_board(
     models_info: dict[str, Path], serial: str | None, board_ip: str | None, copy_dir: str
 ) -> None:
+    if not copy_dir.startswith("/"):
+        copy_dir = "/" + copy_dir
     copy_cmd: str = ""
     for model_name, model_path in models_info.items():
         adb = f"adb -s {serial}" if serial else "adb"
         dest = f"{copy_dir}/{model_name}.synap"
         if board_ip:
-            mkdir_cmd = f"ssh -T root@{board_ip} \"mkdir -p {copy_dir}\""
+            if not check_cnxn_ssh(board_ip):
+                sys.exit(1)
+            mkdir_cmd = f"ssh -o BatchMode=yes -o ConnectTimeout=5 -T root@{board_ip} \"mkdir -p {copy_dir}\""
             dest = f"root@{board_ip}:" + dest
-            copy_cmd = f"scp {model_path}/model.synap {dest} > /dev/null\n"
+            copy_cmd = f"scp -o BatchMode=yes -o ConnectTimeout=5 {model_path}/model.synap {dest} > /dev/null\n"
         else:
+            if not check_cnxn_adb(serial):
+                sys.exit(1)
             mkdir_cmd = f"{adb} shell mkdir -p {copy_dir}"
             copy_cmd = f"{adb} push {model_path}/model.synap {dest} > /dev/null\n"
         se = TempScript(mkdir_cmd, copy_cmd)
-        se.run(success_msg=f'copied "{copy_dir}/{model_name}.synap" to "{dest}"', error_msg="Model copy failed")
+        se.run(success_msg=f'copied "{model_path}/model.synap" to "{dest}"', error_msg="Model copy failed")
 
 
 def get_models_info(
@@ -51,18 +58,8 @@ def get_models_info(
 
 
 def main() -> None:
-    models_info: dict[str, Path] = get_models_info(
-        Path(args.convert_dir), args.models, args.all, args.latest
-    )
-    if not models_info:
-        print(f"No models to copy from {Path(args.convert_dir).resolve()}")
-        exit()
-    copy_models_to_board(models_info, args.serial, args.board_ip, args.copy_dir)
-
-
-if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=f"python -m model.copy", description=__doc__
+        prog=f"python -m pysynap.tools.copy", description=__doc__
     )
     group = parser.add_argument_group(
         "model selection",
@@ -99,7 +96,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--convert_dir",
         type=str,
-        default=f"{getcwd()}/models/converted",
+        default=f"{os.getcwd()}/models/converted",
         metavar="DIR",
         help="Converted models directory (default: %(default)s)",
     )
@@ -111,4 +108,15 @@ if __name__ == "__main__":
         help="Copied models directory on board, will be created if it doesn't exist (default: %(default)s)",
     )
     args = parser.parse_args()
+
+    models_info: dict[str, Path] = get_models_info(
+        Path(args.convert_dir), args.models, args.all, args.latest
+    )
+    if not models_info:
+        print(f"No models to copy from {Path(args.convert_dir).resolve()}")
+        sys.exit(1)
+    copy_models_to_board(models_info, args.serial, args.board_ip, args.copy_dir)
+
+
+if __name__ == "__main__":
     main()
