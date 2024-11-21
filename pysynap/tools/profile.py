@@ -3,6 +3,7 @@
 import argparse
 import importlib.resources
 
+from .utils.board_utils import check_cnxn_adb, check_cnxn_ssh
 from .utils.temp_script import TempScript
 
 
@@ -16,8 +17,8 @@ def profile_models_ssh(
     if not models_dir.startswith("/"):
         models_dir = "/" + models_dir
     bench_script = _get_benchmark_script()
-    cp_bench_cmd = f"scp {bench_script} root@{board_ip}:{models_dir}/benchmark.sh"
-    profile_cmd = f"ssh -T root@{board_ip} << EOF\n"
+    cp_bench_cmd = f"scp -o BatchMode=yes -o ConnectTimeout=5 {bench_script} root@{board_ip}:{models_dir}/benchmark.sh"
+    profile_cmd = f"ssh -o BatchMode=yes -o ConnectTimeout=5 -T root@{board_ip} << 'EOF'\n"
     profile_cmd += f"cd {models_dir}\nchmod u+x benchmark.sh\n"
     if profile_all:
         profile_cmd += "./benchmark.sh ."
@@ -91,9 +92,11 @@ def main() -> None:
     )
     args = parser.parse_args()
     if args.board_ip:
-        profile_models_ssh(args.models, args.models_dir, args.board_ip, args.all)
+        if check_cnxn_ssh(args.board_ip):
+            profile_models_ssh(args.models, args.models_dir, args.board_ip, args.all)
     else:
-        profile_models_adb(args.models, args.models_dir, args.serial, args.all)
+        if check_cnxn_adb(args.serial):
+            profile_models_adb(args.models, args.models_dir, args.serial, args.all)
 
 
 if __name__ == "__main__":
