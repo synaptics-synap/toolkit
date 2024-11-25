@@ -394,10 +394,12 @@ def main():
                 for file in files:
                     if file.endswith(".nb"):
                         ebg_file = os.path.join(root, file)
-                        # Encrypt the EBG file in place
-                        encrypt_model_file(ebg_file, ebg_file,
+                        # Encrypt the EBG file
+                        encrypt_model_file(ebg_file, ebg_file + ".enc",
                                            security_policy, args.enc_tool, vendor_cert, model_cert,
                                            args.encryption_key, args.signature_key)
+                        # Move the encrypted EBG file to the original location
+                        os.replace(ebg_file + ".enc", ebg_file)
                         # Update the security attributes in the corresponding model.json
                         input_descs = None
                         output_descs = None
