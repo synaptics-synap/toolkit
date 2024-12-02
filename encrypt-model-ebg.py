@@ -326,6 +326,11 @@ class ModelImage:
         auth_public_data = self._create_public_data(security_config)
         clear_data = auth_public_data + self._metadata + self._vsi_data + self._padding
 
+        # pad the metadata if necessary
+        padding_bytes = 16 - (len(clear_data) % 16)
+        if padding_bytes != 16:
+            clear_data += b'\0' * padding_bytes
+
         secure_image = encrypt_model_code(enc_tool, clear_data, self._code, encryption_key, signature_key)
 
         # update code and security info
