@@ -10,13 +10,14 @@ import os
 import re
 import struct
 import subprocess
+import collections
 from io import BytesIO
 
 from tempfile import TemporaryDirectory
 
 USAGE = """
 
-This tool encrypts and signs an EBG model.
+This tool encrypts and signs a SYNAP or EBG model.
 
 It takes as input the model to be encrypted and a JSON file describing the security policy with the following format.
 
@@ -26,13 +27,14 @@ where X, Y, Z represent the inputs of the network (in this example the network h
 
  - "secure": the input must be secure memory
  - "non-secure": the input must be non secure memory
- - "any": the input can be either in secure or non-secure memory
+ - "any": the input can be either in secure or non-secure memory [DEFAULT]
 
 and where V, W represent the outputs of the network (in this example the network has two outputs) and take values from:
 
- - "secure-if-input-secure": the output buffer must be secure if at least one input is in secure memory
+ - "secure-if-input-secure": the output buffer must be secure if at least one input is in secure memory  [DEFAULT]
  - "any": the output can be either in secure or non-secure memory
 
+If no security-policy file is specified, the default security will be used for all inpus and outputs.
 
 """
 
@@ -260,16 +262,22 @@ class ModelImage:
     def _create_public_data(self, security_config):
         security_config_out = BytesIO()
 
-        input_descs = security_config.get('inputs', [])
-        output_descs = security_config.get('outputs', [])
+        if security_config:
+            input_descs = security_config.get('inputs', [])
+            output_descs = security_config.get('outputs', [])
+    
+            if self._metadata_header['input_count'] != len(input_descs):
+                raise Exception("Received %d input security policies but the model has %d inputs" %
+                                (len(input_descs), self._metadata_header['input_count']))
+    
+            if self._metadata_header['output_count'] != len(output_descs):
+                raise Exception("Received %d output security policies but the model has %d output" %
+                                (len(input_descs), self._metadata_header['input_count']))
 
-        if self._metadata_header['input_count'] != len(input_descs):
-            raise Exception("Received %d input security policies but the model has %d inputs" %
-                            (len(input_descs), self._metadata_header['input_count']))
-
-        if self._metadata_header['output_count'] != len(output_descs):
-            raise Exception("Received %d output security policies but the model has %d output" %
-                            (len(input_descs), self._metadata_header['input_count']))
+        else:
+            # Create default security policy
+            input_descs = ['any'] * self._metadata_header['input_count']
+            output_descs = ['secure-if-input-secure'] * self._metadata_header['output_count']
 
         # write out the public data header
         public_data = {'metadata_length': (EBG_METADATA_HEADER.size() + (self._metadata_header['input_count'] +
@@ -318,6 +326,15 @@ class ModelImage:
         auth_public_data = self._create_public_data(security_config)
         clear_data = auth_public_data + self._metadata + self._vsi_data + self._padding
 
+        # pad the clear data if necessary
+        # enc_tool requires the clear data to be a multiple of 16 bytes
+        padding_bytes = 16 - (len(clear_data) % 16)
+        if padding_bytes != 16:
+            self._header['padding_length'] = padding_bytes
+            self._padding += b'\0' * padding_bytes
+            auth_public_data = self._create_public_data(security_config)
+            clear_data = auth_public_data + self._metadata + self._vsi_data + self._padding
+
         secure_image = encrypt_model_code(enc_tool, clear_data, self._code, encryption_key, signature_key)
 
         # update code and security info
@@ -328,26 +345,40 @@ class ModelImage:
         self._header['security_type'] = 1
 
 
+def encrypt_model_file(src_file, dst_file, security_policy, enc_tool, vendor_cert, model_cert, encryption_key, signature_key):
+    # read the clear model
+    with open(src_file, 'rb') as fp:
+        model_data = fp.read()
+
+    # parse the clear model
+    model = ModelImage(model_data)
+
+    # encrypt the model
+    model.encrypt_code(security_policy, enc_tool, vendor_cert, model_cert, encryption_key, signature_key)
+
+    # write out the encrypted model
+    with open(dst_file, 'wb') as fp:
+        fp.write(model.serialize())
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Encrypts an EBG file")
+    parser = argparse.ArgumentParser(description="Encrypts a SYNAP or EBG file")
     parser.add_argument('--enc-tool', help="Location of the image encryption tool")
-    parser.add_argument('--security-policy', help="JSON file with the input/output security policy")
+    parser.add_argument('--security-policy', help="Optional JSON file with the input/output security policy")
     parser.add_argument('--vendor-certificate', help="Model vendor root certificate")
     parser.add_argument('--model-certificate', help="Model certificate")
     parser.add_argument('--encryption-key', help="Model encryption key (AES)")
     parser.add_argument('--signature-key', help="Model signature key (RSA)")
-    parser.add_argument('model_file', help="Clear EBG")
+    parser.add_argument('model_file', help="Clear .synap or EBG file")
     parser.add_argument('output_file', help="Location of for the encrypted file")
 
     args = parser.parse_args()
 
-    # read the clear model
-    with open(args.model_file, 'rb') as fp:
-        model_data = fp.read()
-
-    # read the security policy in JSON format
-    with open(args.security_policy) as fp:
-        security_policy = json.load(fp)
+    # read the security policy in JSON format if specified
+    security_policy = None
+    if args.security_policy:
+        with open(args.security_policy) as fp:
+            security_policy = json.load(fp)
 
     # read the root certificate for the model
     with open(args.vendor_certificate, 'rb') as fp:
@@ -357,16 +388,56 @@ def main():
     with open(args.model_certificate, 'rb') as fp:
         model_cert = fp.read()
 
-    # parse the clear model
-    model = ModelImage(model_data)
+    # Check if the file is a SYNAP model
+    _, file_extension = os.path.splitext(args.model_file)
+    
+    if file_extension.lower() == '.synap':
+        print("Processing EBGs in SYNAP model")
+        
+        # Extract zip file in a temporary directory
+        with TemporaryDirectory() as tmp_dir:
+            shutil.unpack_archive(args.model_file, tmp_dir, 'zip')
+            
+            # Find the EBG files (.nb extension)
+            for root, dirs, files in os.walk(tmp_dir):
+                for file in files:
+                    if file.endswith(".nb"):
+                        ebg_file = os.path.join(root, file)
+                        # Encrypt the EBG file
+                        encrypt_model_file(ebg_file, ebg_file + ".enc",
+                                           security_policy, args.enc_tool, vendor_cert, model_cert,
+                                           args.encryption_key, args.signature_key)
+                        # Move the encrypted EBG file to the original location
+                        os.replace(ebg_file + ".enc", ebg_file)
+                        # Update the security attributes in the corresponding model.json
+                        input_descs = None
+                        output_descs = None
+                        if security_policy:
+                            input_descs = security_policy.get('inputs', [])
+                            output_descs = security_policy.get('outputs', [])
+                        json_file = os.path.join(root, "model.json")
+                        with open(json_file, 'r') as fp:
+                            model_json = json.load(fp, object_pairs_hook=collections.OrderedDict)
+                        model_json["secure"] = True
+                        for i, input in enumerate(model_json["Inputs"].values()):
+                            input["security"] = input_descs[i] if input_descs else "any"
+                        for i, output in enumerate(model_json["Outputs"].values()):
+                            output["security"] = output_descs[i] if output_descs else "secure-if-input-secure"
+                        # save json file formatted
+                        with open(json_file, 'w') as fp:
+                            json.dump(model_json, fp, indent=4)
+                            
+            
+            # Zip the temporary directory
+            with TemporaryDirectory() as tmp_out_dir:
+                shutil.make_archive(tmp_out_dir + "/model.synap", 'zip', tmp_dir)
+                shutil.copy(tmp_out_dir + "/model.synap.zip", args.output_file)
 
-    # encrypt the model
-    model.encrypt_code(security_policy, args.enc_tool, vendor_cert, model_cert,
-                       args.encryption_key, args.signature_key)
-
-    # write out the encrypted model
-    with open(args.output_file, 'wb') as fp:
-        fp.write(model.serialize())
+    else:
+        # encrypt the .ebg model
+        encrypt_model_file(args.model_file, args.output_file,
+                           security_policy, args.enc_tool, vendor_cert, model_cert,
+                           args.encryption_key, args.signature_key)
 
 
 if __name__ == "__main__":
