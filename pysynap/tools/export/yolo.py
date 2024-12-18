@@ -1,9 +1,9 @@
 """Export YOLOv8 and YOLOv9 models to various formats"""
 
 import argparse
+import os
 from itertools import product
 from logging import ERROR
-from os import getcwd
 from pathlib import Path
 from shutil import rmtree
 from typing import Any
@@ -11,11 +11,17 @@ from typing import Any
 from ultralytics import YOLO
 from ultralytics.utils import LOGGER
 
-from model.export.base import ModelExporter, ModelExportInfo, export_and_save_models
-from model.utils.model_info import *
+from ..export.base import ModelExporter, ModelExportInfo, export_and_save_models
+from ..utils.model_info import *
+
+__all__ = [
+    "YOLOModelExporter",
+    "export_yolo_models"
+]
 
 # suppress Ultralytics logging
 LOGGER.setLevel(ERROR)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 
 class YOLOModelExporter(ModelExporter):
@@ -76,12 +82,21 @@ class YOLOModelExporter(ModelExporter):
                     f.unlink()
 
 
-def main() -> None:
-    inp_sizes = [
-        tuple(int(dim) for dim in size.split("x")) for size in args.input_sizes
+def export_yolo_models(
+    models: list[str],
+    input_sizes: list[str],
+    export_formats: list[str],
+    quant_types: list[str],
+    quant_dataset: str,
+    export_dir: str,
+    no_parallel: bool
+) -> list[Path]:
+    inp_sizes: list[tuple[int, int]] = [
+        tuple(int(dim) for dim in size.split("x")) for size in input_sizes
     ]
+
     exporters: list[YOLOModelExporter] = []
-    for info in product(args.models, inp_sizes, args.export_formats):
+    for info in product(models, inp_sizes, export_formats):
         model, (inp_width, inp_height), export_format = info
         saved_weights = None
         if Path(model).suffix == ".pt":
@@ -97,30 +112,32 @@ def main() -> None:
                 raise SystemExit(f"Invalid saved model path: \"{model}\"")
         export_info = ModelExportInfo(model, inp_width, inp_height, export_format, saved_weights)
         exporters.append(YOLOModelExporter(export_info))
-    export_and_save_models(
+
+    return export_and_save_models(
         exporters,
-        args.quant_types,
-        args.quant_datasets,
-        args.export_dir,
-        args.no_parallel
+        quant_types,
+        quant_dataset,
+        export_dir,
+        no_parallel
     )
 
 
-if __name__ == "__main__":
+
+def main() -> None:
     parser = argparse.ArgumentParser(
-        prog=f"python -m model.export.yolo", description=__doc__
+    prog=f"python -m pysynap.tools.export.yolo", description=__doc__
     )
     parser.add_argument(
         "--models",
         type=str,
         nargs="+",
         required=True,
-        help="YOLO model (e.g.: yolov9c-seg, yolov8n, yolov8s-pose, ...)",
+        help="YOLOv8 or YOLOv9 model(s) (e.g.: yolov9c-seg, yolov8n, yolov8s-pose, ...)",
     )
     parser.add_argument(
         "--export_dir",
         type=str,
-        default=f"{getcwd()}/models/exported",
+        default=f"{os.getcwd()}/models/exported",
         metavar="DIR",
         help="Exported models directory (default: %(default)s)",
     )
@@ -128,8 +145,8 @@ if __name__ == "__main__":
         "--input_sizes",
         nargs="+",
         default=["640x352"],
-        metavar="SIZE",
-        help="Input image sizes. Each dimension must be a multiple of 32 (wxh) (default: %(default)s)",
+        metavar="WIDTHxHEIGHT",
+        help="Input image sizes. Each dimension must be a multiple of 32 (default: %(default)s)",
     )
     parser.add_argument(
         "--export_formats",
@@ -137,7 +154,7 @@ if __name__ == "__main__":
         default=["tflite"],
         metavar="FMT",
         choices=["tflite", "onnx", "pb", "pt"],
-        help="Export model formats (default: %(default)s)",
+        help="Export model formats, select from [%(choices)s] (default: %(default)s)",
     )
     quant_grp = parser.add_argument_group("optional quantization parameters")
     quant_grp.add_argument(
@@ -145,14 +162,13 @@ if __name__ == "__main__":
         nargs="+",
         metavar="TYPE",
         choices=["uint8", "int8", "int16", "float16", "mixed"],
-        help="Quantization types to apply",
+        help="Quantization types to apply, select from [%(choices)s]",
     )
     quant_grp.add_argument(
-        "--quant_datasets",
+        "--quant_dataset",
         type=str,
         metavar="FILE",
-        nargs="+",
-        help="Dataset(s) to be used for quantization",
+        help="Dataset to be used for quantization",
     )
     parser.add_argument(
         "--no_parallel",
@@ -161,4 +177,17 @@ if __name__ == "__main__":
         help="Disable parallel exports. Useful for resource constrained systems",
     )
     args = parser.parse_args()
+
+    export_yolo_models(
+        args.models,
+        args.input_sizes,
+        args.export_formats,
+        args.quant_types,
+        args.quant_dataset,
+        args.export_dir,
+        args.no_parallel
+    )
+
+
+if __name__ == "__main__":
     main()

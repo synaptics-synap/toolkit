@@ -42,12 +42,11 @@ def get_tflite_layer_info(
     for tensor in layer:
         tensor_info = {}
         tensor_info["name"] = str(tensor["name"])
-        tensor_shape = list(tensor["shape"])
+        tensor_shape = tensor["shape"].tolist()
         tensor_info["shape"] = str(tensor_shape)
         layer_info.append(tensor_info)
     return layer_info
 
 
 if __name__ == "__main__":
-    # print(*get_tflite_input_info("/home/deep5201/synaptics-synap/toolkit/models/exported/yolov8n-seg_640x352_tflite.tflite"), sep="\n")
-    print(*get_onnx_layer_info("/home/deep5201/synaptics-synap/toolkit/models/exported/yolov8n-seg_640x352_onnx.onnx"), sep="\n")
+    pass
