@@ -7,7 +7,6 @@ import argparse
 import json
 import shutil
 import os
-import re
 import struct
 import subprocess
 import collections
@@ -104,6 +103,26 @@ SECURE_IMAGE_HEADER = Struct([('image_type', 'I'),
                               ('image_format', 'I'),
                               ('length', 'I')])
 
+ROOT_CERTIFICATE_HEADER = Struct([('iv', '16s'),
+                                  ('checksum_clear', '32s'),
+                                  ('segID', 'I'),
+                                  ('segID_mask', 'I'),
+                                  ('version', 'I'),
+                                  ('version_mask', 'I'),
+                                  ('production_image_flag', 'I'),
+                                  ('ta_vendor_gid', 'I'),                             
+                                  ('signature', '256s')])
+
+MODEL_CERTIFICATE_HEADER = Struct([('iv', '16s'),
+                                   ('checksum_clear', '32s'),
+                                   ('segID', 'I'),
+                                   ('segID_mask', 'I'),
+                                   ('version', 'I'),
+                                   ('version_mask', 'I'),
+                                   ('production_image_flag', 'I'),
+                                   ('ta_vendor_gid', 'I'),
+                                   ('ta_cert_id', 'I'),
+                                   ('signature', '256s')])
 
 SECURE_MODEL_HEADER = Struct([('iv', '16s'),
                               ('checksum_clear', '32s'),
@@ -123,16 +142,24 @@ INPUT_TYPE_TO_ID = {'secure': 0, 'non-secure': 1, 'any': 2}
 OUTPUT_TYPE_TO_ID = {'secure-if-input-secure': 0, 'any': 1}
 
 
-def encrypt_model_code(enc_tool, clear_data, model_code, encryption_key, signature_key):
+def encrypt_model_code(enc_tool, clear_data, model_code, encryption_key, signature_key, model_cert_obj):
 
     if len(model_code) % 16 != 0:
         raise Exception("Code must be padded")
 
+    prod_flag = model_cert_obj._cert_header['production_image_flag']
+    vendor_gid = model_cert_obj._cert_header['ta_vendor_gid']
+    cert_id = model_cert_obj._cert_header['ta_cert_id']
+    seg_id = model_cert_obj._cert_header['segID']
+    seg_id_mask = model_cert_obj._cert_header['segID_mask']
+    version = model_cert_obj._cert_header['version']
+    version_mask = model_cert_obj._cert_header['version_mask']
+
     with TemporaryDirectory() as tmp_dir:
 
-        extras = EXTRAS.serialize({'prod_image_flag': 0x00000000,
-                                   'vendor_gid': 0x00000001,
-                                   'cert_id': 0x00000001,
+        extras = EXTRAS.serialize({'prod_image_flag': prod_flag,
+                                   'vendor_gid': vendor_gid,
+                                   'cert_id': cert_id,
                                    'clear_payload_len': len(clear_data)})
 
         extras_file = os.path.join(tmp_dir, 'extras')
@@ -156,10 +183,10 @@ def encrypt_model_code(enc_tool, clear_data, model_code, encryption_key, signatu
                         '-t', 'MODEL',  # image type
                         '-k', encryption_key,  # encryption key
                         '-n', signature_key,  # signing key
-                        '-s', '0x00000000',  # segid
-                        '-S', '0xffffffff',  # segid mask
-                        '-r', '0x00000000',  # version
-                        '-R', '0xffffffff',  # version mask
+                        '-s', hex(seg_id),  # segid
+                        '-S', hex(seg_id_mask),  # segid mask
+                        '-r', hex(version),  # version
+                        '-R', hex(version_mask),  # version mask
                         '-x', extras_file,  # extras
                         '-l', '0x0',  # variable length payload
                         '-i', model_file,
@@ -167,8 +194,18 @@ def encrypt_model_code(enc_tool, clear_data, model_code, encryption_key, signatu
                         '-o', output_file]
 
         # run the encryption tool
+        print("Running encryption tool with command:")
         print(' '.join(command_line))
-        subprocess.check_call(command_line)
+
+        try:
+            subprocess.check_call(command_line)
+        except subprocess.CalledProcessError as e:
+
+            # ignore the error if larger than 0, this is a bug in the encryption tool
+            # real error codes of the tool are always negative
+            if e.returncode < 0:                    
+                print(f"Error running encryption tool (exit code = {e.returncode})")
+                exit(1)
 
         # read the output
         with open(output_file, 'rb') as fp:
@@ -198,6 +235,50 @@ def split_secure_image(root_cert, model_cert, secure_image):
                            (auth_data['input_count'] + auth_data['output_count'] ) * 4
 
     return root_cert + model_cert + secure_image[0:security_info_length], secure_image[code_offset:]
+
+
+class RootCertificateImage:
+    def __init__(self, cert):
+        self._parse_header(cert)
+
+    def _parse_header(self, cert_data):
+        self._header, image_payload = SECURE_IMAGE_HEADER.parse(cert_data)
+
+        if self._header['image_type'] != 0x19:
+            raise Exception("Invalid image type 0x%02x (expected 0x19)" % self._header['image_type'])
+
+        if self._header['image_format'] != 1:
+            raise Exception("Unsupported image format %d" % self._header['image_format'])
+
+        if self._header['length'] != len(cert_data):
+            raise Exception("Invalid certificate size (expected %d found %d)" %
+                            (self._header['length'], len(image_payload)))
+        
+        self._cert_header, cert_payload = ROOT_CERTIFICATE_HEADER.parse(image_payload)
+
+        return cert_payload
+
+
+class ModelCertificateImage:
+    def __init__(self, cert):
+        self._parse_header(cert)
+
+    def _parse_header(self, cert_data):
+        self._header, image_payload = SECURE_IMAGE_HEADER.parse(cert_data)
+
+        if self._header['image_type'] != 0x1a:
+            raise Exception("Invalid image type 0x%02x (expected 0x1a or 0x19)" % self._header['image_type'])
+
+        if self._header['image_format'] != 1:
+            raise Exception("Unsupported image format %d" % self._header['image_format'])
+
+        if self._header['length'] != len(cert_data):
+            raise Exception("Invalid certificate size (expected %d found %d)" %
+                            (self._header['length'], len(image_payload)))
+        
+        self._cert_header, cert_payload = MODEL_CERTIFICATE_HEADER.parse(image_payload)
+
+        return cert_payload
 
 
 class ModelImage:
@@ -259,8 +340,7 @@ class ModelImage:
         return EBG_IMAGE_HEADER.serialize(self._header) + self._security_info + \
                self._metadata + self._vsi_data + self._padding + self._code
 
-    def _create_public_data(self, security_config):
-        security_config_out = BytesIO()
+    def _generate_policy(self, security_config):
 
         if security_config:
             input_descs = security_config.get('inputs', [])
@@ -278,6 +358,31 @@ class ModelImage:
             # Create default security policy
             input_descs = ['any'] * self._metadata_header['input_count']
             output_descs = ['secure-if-input-secure'] * self._metadata_header['output_count']
+
+        for input_desc in input_descs:
+            if input_desc not in INPUT_TYPE_TO_ID:
+                print(f"Invalid input security policy {input_desc} (valid policies: {", ".join(INPUT_TYPE_TO_ID)})")
+                exit(1)
+            
+        for output_desc in output_descs:
+            if output_desc not in OUTPUT_TYPE_TO_ID:
+                print(f"Invalid output security policy {output_desc} (valid policies: {", ".join(OUTPUT_TYPE_TO_ID)})")
+                exit(1)
+
+        print("Using security policy for inputs:")
+        for idx, input_desc in enumerate(input_descs):
+            print(f" {idx}: {input_desc}")
+        print()
+
+        print("Using security policy for outputs:")
+        for idx, output_desc in enumerate(output_descs):
+            print(f" {idx}: {output_desc}")
+        print()
+
+        return input_descs, output_descs
+
+    def _create_public_data(self, input_descs, output_descs):
+        security_config_out = BytesIO()
 
         # write out the public data header
         public_data = {'metadata_length': (EBG_METADATA_HEADER.size() + (self._metadata_header['input_count'] +
@@ -302,7 +407,7 @@ class ModelImage:
 
         return security_config_out.getvalue()
 
-    def encrypt_code(self, security_config, enc_tool, root_cert, model_cert,
+    def encrypt_code(self, security_config, enc_tool, root_cert, model_cert, model_cert_obj,
                      encryption_key, signature_key):
 
         # check that the model is a clear model
@@ -323,7 +428,8 @@ class ModelImage:
             self._header['code_length'] = len(self._code)
 
         # create the authenticated public data and the encrypted code
-        auth_public_data = self._create_public_data(security_config)
+        input_descs, output_descs = self._generate_policy(security_config)
+        auth_public_data = self._create_public_data(input_descs, output_descs)
         clear_data = auth_public_data + self._metadata + self._vsi_data + self._padding
 
         # pad the clear data if necessary
@@ -332,10 +438,10 @@ class ModelImage:
         if padding_bytes != 16:
             self._header['padding_length'] = padding_bytes
             self._padding += b'\0' * padding_bytes
-            auth_public_data = self._create_public_data(security_config)
+            auth_public_data = self._create_public_data(input_descs, output_descs)
             clear_data = auth_public_data + self._metadata + self._vsi_data + self._padding
 
-        secure_image = encrypt_model_code(enc_tool, clear_data, self._code, encryption_key, signature_key)
+        secure_image = encrypt_model_code(enc_tool, clear_data, self._code, encryption_key, signature_key, model_cert_obj)
 
         # update code and security info
         self._security_info, self._code = split_secure_image(root_cert, model_cert, secure_image)
@@ -345,7 +451,7 @@ class ModelImage:
         self._header['security_type'] = 1
 
 
-def encrypt_model_file(src_file, dst_file, security_policy, enc_tool, vendor_cert, model_cert, encryption_key, signature_key):
+def encrypt_model_file(src_file, dst_file, security_policy, enc_tool, vendor_cert, model_cert, model_cert_obj, encryption_key, signature_key):
     # read the clear model
     with open(src_file, 'rb') as fp:
         model_data = fp.read()
@@ -354,7 +460,7 @@ def encrypt_model_file(src_file, dst_file, security_policy, enc_tool, vendor_cer
     model = ModelImage(model_data)
 
     # encrypt the model
-    model.encrypt_code(security_policy, enc_tool, vendor_cert, model_cert, encryption_key, signature_key)
+    model.encrypt_code(security_policy, enc_tool, vendor_cert, model_cert, model_cert_obj, encryption_key, signature_key)
 
     # write out the encrypted model
     with open(dst_file, 'wb') as fp:
@@ -363,12 +469,12 @@ def encrypt_model_file(src_file, dst_file, security_policy, enc_tool, vendor_cer
 
 def main():
     parser = argparse.ArgumentParser(description="Encrypts a SYNAP or EBG file")
-    parser.add_argument('--enc-tool', help="Location of the image encryption tool")
+    parser.add_argument('--enc-tool', required=True, help="Location of the image encryption tool")
     parser.add_argument('--security-policy', help="Optional JSON file with the input/output security policy")
-    parser.add_argument('--vendor-certificate', help="Model vendor root certificate")
-    parser.add_argument('--model-certificate', help="Model certificate")
-    parser.add_argument('--encryption-key', help="Model encryption key (AES)")
-    parser.add_argument('--signature-key', help="Model signature key (RSA)")
+    parser.add_argument('--vendor-certificate', required=True, help="Model vendor root certificate")
+    parser.add_argument('--model-certificate', required=True, help="Model certificate")
+    parser.add_argument('--encryption-key', required=True, help="Model encryption key (AES)")
+    parser.add_argument('--signature-key', required=True, help="Model signature key (RSA)")
     parser.add_argument('model_file', help="Clear .synap or EBG file")
     parser.add_argument('output_file', help="Location of for the encrypted file")
 
@@ -388,24 +494,68 @@ def main():
     with open(args.model_certificate, 'rb') as fp:
         model_cert = fp.read()
 
+    # parse and print the vendor certificate information
+    try:
+        vendor_cert_obj = RootCertificateImage(vendor_cert)
+    except Exception as e:
+        print("Error parsing vendor certificate: %s" % str(e))
+        exit(1)    
+
+    print("Using root certificate with following information:")
+    print("  Vendor GID: 0x%08x" % vendor_cert_obj._cert_header['ta_vendor_gid'])
+    print("  Segmentation ID: 0x%08x" % vendor_cert_obj._cert_header['segID'])
+    print("  Segmentation ID Mask: 0x%08x" % vendor_cert_obj._cert_header['segID_mask'])
+    print("  Version: 0x%08x" % vendor_cert_obj._cert_header['version'])
+    print("  Version Mask: 0x%08x" % vendor_cert_obj._cert_header['version_mask'])
+    print("  Production Image Flag: %d" % vendor_cert_obj._cert_header['production_image_flag'])
+    print("")
+
+    # parse and print model certificate information
+    try:
+        model_cert_obj = ModelCertificateImage(model_cert)
+    except Exception as e:
+        print("Error parsing model certificate: %s" % str(e))
+        exit(1)
+
+    print("Using model certificate with following information:")
+    print("  Vendor GID: 0x%08x" % model_cert_obj._cert_header['ta_vendor_gid'])
+    print("  Certificate ID: 0x%08x" % model_cert_obj._cert_header['ta_cert_id'])
+    print("  Segmentation ID: 0x%08x" % model_cert_obj._cert_header['segID'])
+    print("  Segmentation ID Mask: 0x%08x" % model_cert_obj._cert_header['segID_mask'])
+    print("  Version: 0x%08x" % model_cert_obj._cert_header['version'])
+    print("  Version Mask: 0x%08x" % model_cert_obj._cert_header['version_mask'])
+    print("  Production Image Flag: %d" % model_cert_obj._cert_header['production_image_flag'])    
+    print("")
+
+    if model_cert_obj._cert_header['ta_vendor_gid'] != vendor_cert_obj._cert_header['ta_vendor_gid']:
+        print("Error: Model certificate vendor GID does not match the root certificate vendor GID")
+        exit(1)
+
+    if model_cert_obj._cert_header['production_image_flag'] != vendor_cert_obj._cert_header['production_image_flag']:
+        print("Error: Model certificate production image flag does not match the root certificate production image flag")
+        exit(1)
+    
     # Check if the file is a SYNAP model
     _, file_extension = os.path.splitext(args.model_file)
     
     if file_extension.lower() == '.synap':
-        print("Processing EBGs in SYNAP model")
+        print("Processing EBGs in SYNAP model...")
+        print()
         
         # Extract zip file in a temporary directory
         with TemporaryDirectory() as tmp_dir:
-            shutil.unpack_archive(args.model_file, tmp_dir, 'zip')
-            
+            shutil.unpack_archive(args.model_file, tmp_dir, 'zip')            
+
             # Find the EBG files (.nb extension)
             for root, dirs, files in os.walk(tmp_dir):
                 for file in files:
                     if file.endswith(".nb"):
+                        print(f"Processing subgraph {os.path.relpath(root, tmp_dir)}/{file}...")
+                        print()
                         ebg_file = os.path.join(root, file)
                         # Encrypt the EBG file
                         encrypt_model_file(ebg_file, ebg_file + ".enc",
-                                           security_policy, args.enc_tool, vendor_cert, model_cert,
+                                           security_policy, args.enc_tool, vendor_cert, model_cert, model_cert_obj,
                                            args.encryption_key, args.signature_key)
                         # Move the encrypted EBG file to the original location
                         os.replace(ebg_file + ".enc", ebg_file)
@@ -426,6 +576,8 @@ def main():
                         # save json file formatted
                         with open(json_file, 'w') as fp:
                             json.dump(model_json, fp, indent=4)
+
+                        print("Subgraph encrypted")
                             
             
             # Zip the temporary directory
