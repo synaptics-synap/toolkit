@@ -361,12 +361,12 @@ class ModelImage:
 
         for input_desc in input_descs:
             if input_desc not in INPUT_TYPE_TO_ID:
-                print(f"Invalid input security policy {input_desc} (valid policies: {", ".join(INPUT_TYPE_TO_ID)})")
+                print(f"Invalid input security policy {input_desc} (valid policies: {', '.join(INPUT_TYPE_TO_ID)})")
                 exit(1)
             
         for output_desc in output_descs:
             if output_desc not in OUTPUT_TYPE_TO_ID:
-                print(f"Invalid output security policy {output_desc} (valid policies: {", ".join(OUTPUT_TYPE_TO_ID)})")
+                print(f"Invalid output security policy {output_desc} (valid policies: {', '.join(OUTPUT_TYPE_TO_ID)})")
                 exit(1)
 
         print("Using security policy for inputs:")
